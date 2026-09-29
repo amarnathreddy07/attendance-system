@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
-  base: '/attendance-system/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/attendance-system/' : '/',
   plugins: [
     react(),
     VitePWA({
@@ -37,4 +37,4 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
-});
+}));

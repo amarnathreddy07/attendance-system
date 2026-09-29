@@ -113,7 +113,11 @@ export default function AttendanceSession() {
     () => (records ? Object.values(records).filter((r) => r.status === RECORD_STATUS.PRESENT).length : 0),
     [records]
   );
-  const absentCount = markedCount - presentCount;
+  const odCount = useMemo(
+    () => (records ? Object.values(records).filter((r) => r.status === RECORD_STATUS.OD).length : 0),
+    [records]
+  );
+  const absentCount = markedCount - presentCount - odCount;
   const total = students?.length || 0;
   const remaining = Math.max(0, total - markedCount);
 
