@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AttendIt — Architecture Diagram</title>
+  <style>
+    :root {
+      --brand: #4f46e5;
+      --brand-light: #e0e7ff;
+      --brand-dark: #3730a3;
+      --green: #059669;
+      --green-light: #d1fae5;
+      --orange: #d97706;
+      --orange-light: #fef3c7;
+      --rose: #e11d48;
+      --rose-light: #ffe4e6;
+      --slate: #475569;
+      --slate-light: #f1f5f9;
+      --cyan: #0891b2;
+      --cyan-light: #cffafe;
+      --purple: #7c3aed;
+      --purple-light: #ede9fe;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding: 2rem;
+      background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+      border-radius: 16px;
+      color: white;
+    }
+    header h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem; }
+    header p { font-size: 1.05rem; opacity: 0.9; }
+    header .badges { margin-top: 1rem; display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    header .badge {
+      background: rgba(255,255,255,0.2);
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--brand-light);
+      color: var(--brand-dark);
+    }
+    h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.5rem; color: var(--text); }
+    p.desc { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.95rem; }
+
+    /* ========== ARCHITECTURE LAYERS ========== */
+    .layers {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      margin-bottom: 2rem;
+    }
+    .layer {
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      position: relative;
+    }
+    .layer:last-child { border-bottom: none; }
+    .layer-label {
+      font-weight: 700;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      min-width: 130px;
+      color: rgba(255,255,255,0.85);
+    }
+    .layer-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      flex: 1;
+    }
+    .layer-tag {
+      background: rgba(255,255,255,0.2);
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+      white-space: nowrap;
+    }
+    .layer-arrow {
+      text-align: center;
+      font-size: 1.4rem;
+      color: var(--text-muted);
+      padding: 0.15rem 0;
+      background: var(--bg);
+    }
+    .l-presentation { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
+    .l-state { background: linear-gradient(135deg, #0891b2, #0e7490); color: white; }
+    .l-dal { background: linear-gradient(135deg, #059669, #047857); color: white; }
+    .l-db { background: linear-gradient(135deg, #d97706, #b45309); color: white; }
+    .l-infra { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; }
+
+    /* ========== TECH STACK GRID ========== */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .tech-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .tech-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-2px); }
+    .tech-card h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .tech-card .dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .tech-card ul { list-style: none; padding: 0; }
+    .tech-card li {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      padding: 0.2rem 0;
+      padding-left: 1rem;
+      position: relative;
+    }
+    .tech-card li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--border);
+      transform: translateY(-50%);
+    }
+
+    /* ========== ER DIAGRAM ========== */
+    .er-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
+    .er-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      min-width: 700px;
+    }
+    .er-table {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: white;
+    }
+    .er-table-header {
+      padding: 0.75rem 1rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .er-table-body { padding: 0; }
+    .er-field {
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .er-field:first-child { border-top: none; }
+    .er-field .fname { font-weight: 600; font-family: 'Consolas', 'Monaco', monospace; }
+    .er-field .ftype { color: var(--text-muted); font-size: 0.75rem; }
+    .er-pk { background: #fef9c3; }
+    .er-fk { background: #ede9fe; }
+    .er-idx { background: #dbeafe; }
+
+    .t-settings .er-table-header { background: #f1f5f9; color: var(--slate); }
+    .t-teachers .er-table-header { background: #ede9fe; color: var(--purple); }
+    .t-classes .er-table-header { background: #e0e7ff; color: var(--brand); }
+    .t-students .er-table-header { background: #d1fae5; color: var(--green); }
+    .t-sessions .er-table-header { background: #fef3c7; color: var(--orange); }
+    .t-records .er-table-header { background: #ffe4e6; color: var(--rose); }
+
+    .er-legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .er-legend span { display: flex; align-items: center; gap: 0.4rem; }
+    .er-legend .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
+
+    /* ========== RELATIONSHIPS DIAGRAM ========== */
+    .rel-diagram {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    .rel-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+      padding: 1rem 0;
+    }
+    .rel-box {
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .rel-arrow {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      padding: 0 0.5rem;
+    }
+
+    /* ========== DATA FLOW ========== */
+    .flow-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .flow-steps {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+    .flow-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 130px;
+      flex: 1;
+    }
+    .flow-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: white;
+      font-weight: 700;
+    }
+    .flow-label { font-weight: 600; font-size: 0.85rem; text-align: center; }
+    .flow-sub { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.2rem; }
+    .flow-connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 40px;
+      color: var(--text-muted);
+      font-size: 1.3rem;
+      padding-top: 0;
+      margin-top: -1rem;
+    }
+
+    .flow-return {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--green-light);
+      border-radius: 10px;
+      font-size: 0.85rem;
+      color: var(--green);
+      font-weight: 600;
+    }
+    .flow-return .arrow { font-size: 1.2rem; }
+
+    /* ========== WORKFLOW ========== */
+    .workflow-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .workflow-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .wf-step {
+      background: var(--slate-light);
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+      position: relative;
+      border: 1px solid var(--border);
+    }
+    .wf-step .num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.5rem;
+    }
+    .wf-step .wf-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .wf-step .wf-desc { font-size: 0.78rem; color: var(--text-muted); }
+
+    /* ========== COMPONENT TREE ========== */
+    .tree-container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--text);
+    }
+    .tree-container .c-comment { color: var(--text-muted); }
+    .tree-container .c-component { color: var(--brand); font-weight: 700; }
+    .tree-container .c-file { color: var(--green); }
+    .tree-container .c-route { color: var(--orange); font-weight: 600; }
+    .tree-container .c-symbol { color: var(--text-muted); }
+
+    /* ========== DEPLOY PIPELINE ========== */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+    .pipe-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 140px;
+      flex: 1;
+    }
+    .pipe-icon {
+      width: 60px; height: 60px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: white;
+      font-weight: 700;
+    }
+    .pipe-label { font-weight: 600; font-size: 0.85rem; text-align: center; }
+    .pipe-sub { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.2rem; }
+    .pipe-connector {
+      display: flex;
+      align-items: center;
+      min-width: 40px;
+      color: var(--text-muted);
+      font-size: 1.3rem;
+    }
+
+    /* ========== FOOTER ========== */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 1rem; }
+      header h1 { font-size: 1.6rem; }
+      .er-grid { grid-template-columns: 1fr; }
+      .tech-grid { grid-template-columns: 1fr; }
+      .layer { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .layer-label { min-width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ========== HEADER ========== -->
+    <header>
+      <h1>AttendIt Architecture</h1>
+      <p>Local-first teacher attendance management system</p>
+      <div class="badges">
+        <span class="badge">React 18</span>
+        <span class="badge">Dexie.js / IndexedDB</span>
+        <span class="badge">Vite 5</span>
+        <span class="badge">Tailwind CSS</span>
+        <span class="badge">PWA + Service Worker</span>
+        <span class="badge">Zero Backend</span>
+      </div>
+    </header>
+
+    <!-- ========== 1. SYSTEM ARCHITECTURE LAYERS ========== -->
+    <h2>1. System Architecture</h2>
+    <p class="desc">Five-layer architecture from UI to infrastructure. No server, no cloud — 100% client-side.</p>
+    <div class="layers">
+      <div class="layer l-presentation">
+        <div class="layer-label">Presentation</div>
+        <div class="layer-content">
+          <span class="layer-tag">12 Page Components</span>
+          <span class="layer-tag">11 Reusable Components</span>
+          <span class="layer-tag">Tailwind CSS</span>
+          <span class="layer-tag">SVG Icon System (40+)</span>
+          <span class="layer-tag">HashRouter (v6)</span>
+        </div>
+      </div>
+      <div class="layer-arrow">▼</div>
+      <div class="layer l-state">
+        <div class="layer-label">State Layer</div>
+        <div class="layer-content">
+          <span class="layer-tag">AppContext (React Context)</span>
+          <span class="layer-tag">useLiveQuery (Reactive)</span>
+          <span class="layer-tag">useState (Local UI)</span>
+        </div>
+      </div>
+      <div class="layer-arrow">▼</div>
+      <div class="layer l-dal">
+        <div class="layer-label">Data Access</div>
+        <div class="layer-content">
+          <span class="layer-tag">repositories.js</span>
+          <span class="layer-tag">25+ CRUD Functions</span>
+          <span class="layer-tag">Transactions</span>
+          <span class="layer-tag">Upserts &amp; Bulk Imports</span>
+        </div>
+      </div>
+      <div class="layer-arrow">▼</div>
+      <div class="layer l-db">
+        <div class="layer-label">Database</div>
+        <div class="layer-content">
+          <span class="layer-tag">Dexie.js v4</span>
+          <span class="layer-tag">IndexedDB</span>
+          <span class="layer-tag">6 Object Stores</span>
+          <span class="layer-tag">7 Schema Versions</span>
+          <span class="layer-tag">Compound Indexes</span>
+        </div>
+      </div>
+      <div class="layer-arrow">▼</div>
+      <div class="layer l-infra">
+        <div class="layer-label">Infrastructure</div>
+        <div class="layer-content">
+          <span class="layer-tag">Vite 5 Build</span>
+          <span class="layer-tag">Workbox Service Worker</span>
+          <span class="layer-tag">vite-plugin-pwa</span>
+          <span class="layer-tag">GitHub Actions CI/CD</span>
+          <span class="layer-tag">GitHub Pages</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 2. TECH STACK ========== -->
+    <h2>2. Technology Stack</h2>
+    <div class="tech-grid">
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--brand)"></span> Frontend</h4>
+        <ul>
+          <li>React 18.3 — Functional components + hooks</li>
+          <li>React Router 6.26 — HashRouter for SPA routing</li>
+          <li>Tailwind CSS 3.4 — Utility-first styling</li>
+        </ul>
+      </div>
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--orange)"></span> Data Layer</h4>
+        <ul>
+          <li>Dexie.js 4.0 — IndexedDB wrapper</li>
+          <li>dexie-react-hooks — Reactive useLiveQuery</li>
+          <li>IndexedDB — Browser-native NoSQL DB</li>
+        </ul>
+      </div>
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--green)"></span> Build &amp; Dev</h4>
+        <ul>
+          <li>Vite 5.4 — Dev server + production build</li>
+          <li>@vitejs/plugin-react — Fast Refresh</li>
+          <li>PostCSS + Autoprefixer</li>
+        </ul>
+      </div>
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--purple)"></span> PWA &amp; Offline</h4>
+        <ul>
+          <li>vite-plugin-pwa 1.3 — Manifest + SW generation</li>
+          <li>Workbox — Precaching + offline fallback</li>
+          <li>autoUpdate registration type</li>
+        </ul>
+      </div>
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--cyan)"></span> Deploy</h4>
+        <ul>
+          <li>GitHub Actions — CI/CD pipeline</li>
+          <li>GitHub Pages — Static hosting</li>
+          <li>Node.js 20 runtime</li>
+        </ul>
+      </div>
+      <div class="tech-card">
+        <h4><span class="dot" style="background:var(--rose)"></span> Language</h4>
+        <ul>
+          <li>JavaScript (ES2022) with JSX</li>
+          <li>ES Modules ("type": "module")</li>
+          <li>No TypeScript — pure JS codebase</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ========== 3. COMPONENT HIERARCHY ========== -->
+    <h2>3. Component Hierarchy</h2>
+    <p class="desc">React component tree from entry point to page-level components.</p>
+    <div class="tree-container"><span class="c-file">main.jsx</span>
+<span class="c-symbol">└──</span> <span class="c-component">&lt;React.StrictMode&gt;</span>
+<span class="c-symbol">      └──</span> <span class="c-component">&lt;AppProvider&gt;</span>              <span class="c-comment">// AppContext.jsx — global state</span>
+<span class="c-symbol">            └──</span> <span class="c-component">&lt;App&gt;</span>                  <span class="c-comment">// App.jsx — routing</span>
+<span class="c-symbol">                  └──</span> <span class="c-component">&lt;HashRouter&gt;</span>
+<span class="c-symbol">                        ├──</span> <span class="c-component">&lt;OnlineWatcher /&gt;</span>   <span class="c-comment">// side-effect: online/offline</span>
+<span class="c-symbol">                        ├──</span> <span class="c-component">&lt;Toasts /&gt;</span>           <span class="c-comment">// Toasts.jsx — notifications</span>
+<span class="c-symbol">                        └──</span> <span class="c-component">&lt;Routes&gt;</span>
+<span class="c-symbol">                              │</span>
+<span class="c-symbol">                              ├──</span> <span class="c-route">/onboarding</span> <span class="c-symbol">→</span> <span class="c-component">&lt;Gate&gt;</span> <span class="c-symbol">→</span> <span class="c-component">&lt;Onboarding /&gt;</span>
+<span class="c-symbol">                              │</span>
+<span class="c-symbol">                              └──</span> <span class="c-comment">(wrapped routes)</span>
+<span class="c-symbol">                                    └──</span> <span class="c-component">&lt;Gate&gt;</span> <span class="c-symbol">→</span> <span class="c-component">&lt;Layout /&gt;</span>
+<span class="c-symbol">                                          ├──</span> <span class="c-component">&lt;Sidebar /&gt;</span>        <span class="c-comment">// nav + live clock</span>
+<span class="c-symbol">                                          ├──</span> <span class="c-component">&lt;header&gt;</span>           <span class="c-comment">// mobile nav + install btn</span>
+<span class="c-symbol">                                          ├──</span> <span class="c-component">&lt;Outlet /&gt;</span>         <span class="c-comment">// ← page renders here</span>
+<span class="c-symbol">                                          └──</span> <span class="c-component">&lt;footer&gt;</span>
+<span class="c-symbol">                                                │</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/</span>                <span class="c-component">&lt;Dashboard /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/history</span>         <span class="c-component">&lt;GlobalAttendanceHistory /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/classes/new</span>     <span class="c-component">&lt;ClassSetup /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/classes/:id</span>     <span class="c-component">&lt;ClassDetail /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/.../attendance</span>  <span class="c-component">&lt;AttendanceSession /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/.../review</span>      <span class="c-component">&lt;AttendanceReview /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/.../history</span>     <span class="c-component">&lt;AttendanceHistory /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/.../history/:sid</span><span class="c-component">&lt;SessionDetail /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/.../students/:s</span> <span class="c-component">&lt;StudentHistory /&gt;</span>
+<span class="c-symbol">                                                ├──</span> <span class="c-route">/settings</span>       <span class="c-component">&lt;Settings /&gt;</span>
+<span class="c-symbol">                                                └──</span> <span class="c-route">/faq</span>             <span class="c-component">&lt;Faq /&gt;</span></div>
+
+    <!-- ========== 4. DATABASE SCHEMA (ER) ========== -->
+    <h2>4. Database Schema (ER Diagram)</h2>
+    <p class="desc">6 object stores in IndexedDB. Dexie.js manages schema versioning (v1 → v7) with compound indexes for fast lookups.</p>
+    <div class="er-container">
+      <div class="er-grid">
+        <!-- settings -->
+        <div class="er-table t-settings">
+          <div class="er-table-header"><span class="dot" style="background:var(--slate)"></span> settings</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">key</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field"><span class="fname">value</span><span class="ftype">Any</span></div>
+            <div class="er-field"><span class="fname">updated_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+        <!-- teachers -->
+        <div class="er-table t-teachers">
+          <div class="er-table-header"><span class="dot" style="background:var(--purple)"></span> teachers</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">id</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field"><span class="fname">name</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">email</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">created_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+        <!-- classes -->
+        <div class="er-table t-classes">
+          <div class="er-table-header"><span class="dot" style="background:var(--brand)"></span> classes</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">id</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field er-idx"><span class="fname">class_name</span><span class="ftype">String · IDX</span></div>
+            <div class="er-field"><span class="fname">section</span><span class="ftype">String</span></div>
+            <div class="er-field er-idx"><span class="fname">year</span><span class="ftype">Number · IDX</span></div>
+            <div class="er-field er-idx"><span class="fname">semester</span><span class="ftype">Number · IDX</span></div>
+            <div class="er-field"><span class="fname">attendance_threshold</span><span class="ftype">Number (default 75)</span></div>
+            <div class="er-field er-idx"><span class="fname">created_at</span><span class="ftype">Timestamp · IDX</span></div>
+            <div class="er-field"><span class="fname">updated_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+        <!-- students -->
+        <div class="er-table t-students">
+          <div class="er-table-header"><span class="dot" style="background:var(--green)"></span> students</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">id</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field er-fk"><span class="fname">class_id</span><span class="ftype">FK → classes.id</span></div>
+            <div class="er-field er-idx"><span class="fname">application_number</span><span class="ftype">String · IDX</span></div>
+            <div class="er-field"><span class="fname">roll_number</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">prn_number</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">name</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">email</span><span class="ftype">String</span></div>
+            <div class="er-field"><span class="fname">status</span><span class="ftype">"active" | "inactive"</span></div>
+            <div class="er-field"><span class="fname">created_at</span><span class="ftype">Timestamp</span></div>
+            <div class="er-field"><span class="fname">updated_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+        <!-- attendance_sessions -->
+        <div class="er-table t-sessions">
+          <div class="er-table-header"><span class="dot" style="background:var(--orange)"></span> attendance_sessions</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">id</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field er-fk"><span class="fname">class_id</span><span class="ftype">FK → classes.id</span></div>
+            <div class="er-field er-idx"><span class="fname">date</span><span class="ftype">"YYYY-MM-DD" · IDX</span></div>
+            <div class="er-field"><span class="fname">name</span><span class="ftype">String (optional)</span></div>
+            <div class="er-field"><span class="fname">status</span><span class="ftype">"in_progress" | "completed"</span></div>
+            <div class="er-field"><span class="fname">created_at</span><span class="ftype">Timestamp</span></div>
+            <div class="er-field"><span class="fname">submitted_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+        <!-- attendance_records -->
+        <div class="er-table t-records">
+          <div class="er-table-header"><span class="dot" style="background:var(--rose)"></span> attendance_records</div>
+          <div class="er-table-body">
+            <div class="er-field er-pk"><span class="fname">id</span><span class="ftype">String (PK)</span></div>
+            <div class="er-field er-fk"><span class="fname">attendance_session_id</span><span class="ftype">FK → sessions.id</span></div>
+            <div class="er-field er-fk"><span class="fname">student_id</span><span class="ftype">FK → students.id</span></div>
+            <div class="er-field"><span class="fname">status</span><span class="ftype">"present" | "absent" | "od"</span></div>
+            <div class="er-field"><span class="fname">created_at</span><span class="ftype">Timestamp</span></div>
+            <div class="er-field"><span class="fname">updated_at</span><span class="ftype">Timestamp</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="er-legend">
+        <span><span class="swatch" style="background:#fef9c3"></span> Primary Key</span>
+        <span><span class="swatch" style="background:#ede9fe"></span> Foreign Key</span>
+        <span><span class="swatch" style="background:#dbeafe"></span> Indexed</span>
+      </div>
+    </div>
+
+    <!-- ========== 5. ENTITY RELATIONSHIPS ========== -->
+    <h2>5. Entity Relationships</h2>
+    <div class="rel-diagram">
+      <div class="rel-flow">
+        <div class="rel-box" style="background:var(--purple-light); color:var(--purple);">teachers<br/><small style="font-weight:400;font-size:0.7rem;">1 teacher</small></div>
+        <div class="rel-arrow">→</div>
+        <div class="rel-box" style="background:var(--brand-light); color:var(--brand);">classes<br/><small style="font-weight:400;font-size:0.7rem;">1..N classes</small></div>
+        <div class="rel-arrow">→</div>
+        <div class="rel-box" style="background:var(--green-light); color:var(--green);">students<br/><small style="font-weight:400;font-size:0.7rem;">0..N per class</small></div>
+      </div>
+      <div class="rel-flow" style="margin-top:0.5rem;">
+        <div class="rel-box" style="background:var(--brand-light); color:var(--brand);">classes<br/><small style="font-weight:400;font-size:0.7rem;">1 class</small></div>
+        <div class="rel-arrow">→</div>
+        <div class="rel-box" style="background:var(--orange-light); color:var(--orange);">attendance_sessions<br/><small style="font-weight:400;font-size:0.7rem;">0..N per class</small></div>
+        <div class="rel-arrow">→</div>
+        <div class="rel-box" style="background:var(--rose-light); color:var(--rose);">attendance_records<br/><small style="font-weight:400;font-size:0.7rem;">0..N per session</small></div>
+        <div class="rel-arrow">↗</div>
+        <div class="rel-box" style="background:var(--green-light); color:var(--green); border:2px dashed var(--green);">students<br/><small style="font-weight:400;font-size:0.7rem;">FK link</small></div>
+      </div>
+    </div>
+
+    <!-- ========== 6. DATA FLOW ========== -->
+    <h2>6. Data Flow (Reactive Round-Trip)</h2>
+    <p class="desc">User actions flow down to IndexedDB. Dexie's live query system detects changes and re-renders the UI automatically — no manual refresh needed.</p>
+    <div class="flow-container">
+      <div class="flow-steps">
+        <div class="flow-step">
+          <div class="flow-icon" style="background:var(--brand);">👆</div>
+          <div class="flow-label">User Action</div>
+          <div class="flow-sub">Click Present / Absent / OD</div>
+        </div>
+        <div class="flow-connector">→</div>
+        <div class="flow-step">
+          <div class="flow-icon" style="background:#6366f1;">⚡</div>
+          <div class="flow-label">Component Handler</div>
+          <div class="flow-sub">mark(RECORD_STATUS.PRESENT)</div>
+        </div>
+        <div class="flow-connector">→</div>
+        <div class="flow-step">
+          <div class="flow-icon" style="background:var(--green);">📦</div>
+          <div class="flow-label">Repository</div>
+          <div class="flow-sub">upsertRecord(session, student, status)</div>
+        </div>
+        <div class="flow-connector">→</div>
+        <div class="flow-step">
+          <div class="flow-icon" style="background:var(--cyan);">🔄</div>
+          <div class="flow-label">Dexie Transaction</div>
+          <div class="flow-sub">Find → Update or Insert</div>
+        </div>
+        <div class="flow-connector">→</div>
+        <div class="flow-step">
+          <div class="flow-icon" style="background:var(--orange);">💾</div>
+          <div class="flow-label">IndexedDB</div>
+          <div class="flow-sub">Write persisted to disk</div>
+        </div>
+      </div>
+      <div class="flow-return">
+        <span class="arrow">↩</span>
+        Dexie change detection → useLiveQuery re-fires → React re-renders (progress bar, counters, student card update)
+      </div>
+    </div>
+
+    <!-- ========== 7. ATTENDANCE WORKFLOW ========== -->
+    <h2>7. Attendance Workflow</h2>
+    <p class="desc">End-to-end flow from dashboard to completed attendance record.</p>
+    <div class="workflow-container">
+      <div class="workflow-steps">
+        <div class="wf-step">
+          <div class="num" style="background:var(--brand);">1</div>
+          <div class="wf-title">Dashboard</div>
+          <div class="wf-desc">Select a class → click "Take Attendance"</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:#6366f1;">2</div>
+          <div class="wf-title">Session Setup</div>
+          <div class="wf-desc">Create session or resume in-progress session</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:var(--green);">3</div>
+          <div class="wf-title">Mark Students</div>
+          <div class="wf-desc">Present / Absent / OD — keyboard shortcuts supported</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:var(--cyan);">4</div>
+          <div class="wf-title">Presentation Mode</div>
+          <div class="wf-desc">Optional fullscreen for projector use</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:var(--orange);">5</div>
+          <div class="wf-title">Review</div>
+          <div class="wf-desc">Toggle marks before final submission</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:var(--rose);">6</div>
+          <div class="wf-title">Submit</div>
+          <div class="wf-desc">Session locked, records persisted permanently</div>
+        </div>
+        <div class="wf-step">
+          <div class="num" style="background:var(--purple);">7</div>
+          <div class="wf-title">History</div>
+          <div class="wf-desc">Calendar view, per-class &amp; global, CSV export</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 8. BUILD & DEPLOY PIPELINE ========== -->
+    <h2>8. Build &amp; Deploy Pipeline</h2>
+    <p class="desc">Automated CI/CD via GitHub Actions. Push to master triggers build and deploy.</p>
+    <div class="workflow-container">
+      <div class="pipeline">
+        <div class="pipe-stage">
+          <div class="pipe-icon" style="background:var(--text);">📝</div>
+          <div class="pipe-label">git push</div>
+          <div class="pipe-sub">Push to master</div>
+        </div>
+        <div class="pipe-connector">→</div>
+        <div class="pipe-stage">
+          <div class="pipe-icon" style="background:var(--brand);">⚙️</div>
+          <div class="pipe-label">GitHub Actions</div>
+          <div class="pipe-sub">Node.js 20 + npm ci</div>
+        </div>
+        <div class="pipe-connector">→</div>
+        <div class="pipe-stage">
+          <div class="pipe-icon" style="background:var(--green);">🔨</div>
+          <div class="pipe-label">vite build</div>
+          <div class="pipe-sub">Output: client/dist/</div>
+        </div>
+        <div class="pipe-connector">→</div>
+        <div class="pipe-stage">
+          <div class="pipe-icon" style="background:var(--cyan);">📦</div>
+          <div class="pipe-label">Upload Artifact</div>
+          <div class="pipe-sub">Pages artifact</div>
+        </div>
+        <div class="pipe-connector">→</div>
+        <div class="pipe-stage">
+          <div class="pipe-icon" style="background:var(--purple);">🌐</div>
+          <div class="pipe-label">GitHub Pages</div>
+          <div class="pipe-sub">Live at amarnath1564.github.io</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== FOOTER ========== -->
+    <footer>
+      <p><strong>AttendIt</strong> — Architecture Diagram</p>
+      <p>Generated for the Student Attendance System · August 2026</p>
+    </footer>
+
+  </div>
+</body>
+</html>
