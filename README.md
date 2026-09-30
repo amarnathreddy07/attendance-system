@@ -2,7 +2,7 @@
 
 A local-first, offline-friendly attendance management application for teachers. All data is stored privately on your device using the browser's IndexedDB database. No account required, no cloud backend, no server.
 
-**Deployed on GitHub Pages:** [https://amarnath1564.github.io/attendance-system/](https://amarnath1564.github.io/attendance-system/)
+**Deployed on GitHub Pages:** [https://amarnathreddy07.github.io/attendance-system/](https://amarnathreddy07.github.io/attendance-system/)
 
 ---
 
@@ -84,7 +84,7 @@ Use the **Local Data** section in Settings to:
 Open the deployed application:
 
 ```
-https://amarnath1564.github.io/attendance-system/
+https://amarnathreddy07.github.io/attendance-system/
 ```
 
 No installation required. Works in any modern browser.
@@ -93,26 +93,21 @@ No installation required. Works in any modern browser.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/amarnath1564/attendance-system.git
+   git clone https://github.com/amarnathreddy07/attendance-system.git
    cd attendance-system
    ```
 
-2. **Navigate to the client directory:**
-   ```bash
-   cd client
-   ```
-
-3. **Install dependencies:**
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-4. **Start the development server:**
+3. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-5. **Open in your browser:**
+4. **Open in your browser:**
    - Vite will print the URL (usually `http://localhost:5173`)
    - The application loads with hash-based routing
 
@@ -121,7 +116,6 @@ No installation required. Works in any modern browser.
 Build the application for production:
 
 ```bash
-cd client
 npm run build        # Creates optimized build in dist/
 npm run preview      # Serves the production build locally
 ```
@@ -197,15 +191,15 @@ In **Settings → Local Data**:
 
 ### Automatic Deployment (GitHub Actions)
 
-Pushing to the `master` branch automatically:
+Pushing to the `main` branch automatically:
 1. Installs dependencies
 2. Builds the production application
 3. Deploys to GitHub Pages
-4. Application is live at `https://amarnath1564.github.io/attendance-system/`
+4. Application is live at `https://amarnathreddy07.github.io/attendance-system/`
 
 **GitHub Actions Workflow:**
 - Located in `.github/workflows/deploy.yml`
-- Runs on every push to `master` branch
+- Runs on every push to `main` branch
 - Uses Node.js 20, npm, and official GitHub Pages actions
 
 ### Enabling GitHub Pages in Your Repository
@@ -216,13 +210,18 @@ If not already enabled:
 2. Under "Build and deployment":
    - Source: `GitHub Actions`
 3. Save
-4. GitHub Actions will automatically deploy the next push to `master`
+4. GitHub Actions will automatically deploy the next push to `main`
 
 ### Configuration Details
 
 **Vite Base Path:**
-- Configured in `vite.config.js`: `base: '/attendance-system/'`
-- Ensures all assets load correctly from the GitHub Pages subpath
+- Defaults to `/`, so the app serves from the domain root with no configuration
+- GitHub Pages hosts this project at the `/attendance-system/` subpath, so the deploy
+  workflow sets `BASE_PATH=/attendance-system/` on the build step
+- The same value feeds the PWA manifest (`start_url`, `scope`) and the workbox
+  `navigateFallback`, so assets, install, and offline fallback all stay in agreement
+- To deploy elsewhere, change the `BASE_PATH` env in `.github/workflows/deploy.yml`
+  (keep the trailing slash)
 
 **Routing:**
 - Uses HashRouter for compatibility with GitHub Pages
@@ -268,7 +267,7 @@ All data remains in IndexedDB and is accessible from the installed app.
 ### Application won't load
 - Check browser compatibility (Chrome, Edge, Firefox, Safari all supported)
 - Clear browser cache and reload
-- Ensure you're on the correct URL: `https://amarnath1564.github.io/attendance-system/`
+- Ensure you're on the correct URL: `https://amarnathreddy07.github.io/attendance-system/`
 
 ### Data disappeared
 - Check that you're using the same device/browser where you created your profile
@@ -297,29 +296,34 @@ All data remains in IndexedDB and is accessible from the installed app.
 ### Project Structure
 
 ```
-attendance-system/
-├── client/                   # Frontend application
-│   ├── src/
-│   │   ├── pages/           # Page components (Dashboard, ClassDetail, etc.)
-│   │   ├── components/      # Reusable components (Modal, Dropdown, etc.)
-│   │   ├── db/              # IndexedDB setup (Dexie)
-│   │   ├── lib/             # Utilities (CSV, backup, risk calculations)
-│   │   ├── state/           # React Context (AppContext)
-│   │   ├── App.jsx          # Root component with routing
-│   │   ├── main.jsx         # Entry point
-│   │   └── index.css        # Tailwind imports
-│   ├── public/              # Static assets (icons, manifest)
-│   ├── index.html           # HTML template
-│   ├── vite.config.js       # Vite configuration (base path, PWA)
-│   ├── package.json         # Dependencies and scripts
-│   ├── tailwind.config.js   # Tailwind configuration
-│   ├── postcss.config.js    # PostCSS configuration
-│   └── dist/                # Production build (generated)
+<repo root>/
+├── src/
+│   ├── pages/              # Page components (Dashboard, ClassDetail, etc.)
+│   ├── components/         # Reusable components (Modal, Dropdown, etc.)
+│   ├── db/                 # IndexedDB setup (Dexie)
+│   ├── lib/                # Utilities (CSV, backup, risk calculations)
+│   ├── state/              # React Context (AppContext)
+│   ├── App.jsx             # Root component with routing
+│   ├── main.jsx            # Entry point
+│   └── index.css           # Tailwind imports
+├── public/                 # Static assets (icons, manifest)
+├── scripts/                # Puppeteer/Playwright verification and demo scripts
+├── docs/
+│   └── ARCHITECTURE.html   # Architecture diagram and data flow
 ├── .github/workflows/
-│   └── deploy.yml           # GitHub Actions deployment workflow
-├── .gitignore               # Git ignore rules
-└── README.md                # This file
+│   └── deploy.yml          # GitHub Actions deployment workflow
+├── index.html              # HTML template
+├── vite.config.js          # Vite configuration (base path, PWA)
+├── package.json            # Dependencies and scripts
+├── tailwind.config.js      # Tailwind configuration
+├── postcss.config.js       # PostCSS configuration
+├── .gitignore              # Git ignore rules
+└── README.md               # This file
 ```
+
+The app lives at the repository root — there is no `client/` wrapper, so every
+command runs from the directory you cloned. `dist/` is generated by `npm run build`
+and is git-ignored.
 
 ### Available Scripts
 
@@ -370,7 +374,7 @@ If you encounter bugs:
    - Browser and version
    - Steps to reproduce
    - Expected vs actual behavior
-3. Open an issue on GitHub: [amarnath1564/attendance-system/issues](https://github.com/amarnath1564/attendance-system/issues)
+3. Open an issue on GitHub: [amarnathreddy07/attendance-system/issues](https://github.com/amarnathreddy07/attendance-system/issues)
 
 ---
 

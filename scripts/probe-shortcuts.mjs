@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-core';
 
 const CHROME = 'C:/Users/Amarnath Reddy/AppData/Local/Google/Chrome/Application/chrome.exe';
-const BASE = 'http://localhost:5173/attendance-system/';
+const BASE = 'http://localhost:5173/';
 
 let failures = 0;
 const ok = (name, cond, extra = '') => {
