@@ -187,7 +187,7 @@ console.log('\n' + '═'.repeat(80));
 console.log('\n✨ BUILD & DEPLOYMENT STATUS\n');
 
 const build = [
-  'File Modified: client/src/pages/Settings.jsx',
+  'File Modified: src/pages/Settings.jsx',
   'Changes: Enhanced onConfirm handler with backup logic',
   'Build Time: 3.04s',
   'Build Size: 358.03 kB (gzip: 110.31 kB)',
