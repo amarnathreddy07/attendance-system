@@ -97,22 +97,17 @@ No installation required. Works in any modern browser.
    cd attendance-system
    ```
 
-2. **Navigate to the client directory:**
-   ```bash
-   cd client
-   ```
-
-3. **Install dependencies:**
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-4. **Start the development server:**
+3. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-5. **Open in your browser:**
+4. **Open in your browser:**
    - Vite will print the URL (usually `http://localhost:5173`)
    - The application loads with hash-based routing
 
@@ -121,7 +116,6 @@ No installation required. Works in any modern browser.
 Build the application for production:
 
 ```bash
-cd client
 npm run build        # Creates optimized build in dist/
 npm run preview      # Serves the production build locally
 ```
@@ -298,27 +292,26 @@ All data remains in IndexedDB and is accessible from the installed app.
 
 ```
 attendance-system/
-├── client/                   # Frontend application
-│   ├── src/
-│   │   ├── pages/           # Page components (Dashboard, ClassDetail, etc.)
-│   │   ├── components/      # Reusable components (Modal, Dropdown, etc.)
-│   │   ├── db/              # IndexedDB setup (Dexie)
-│   │   ├── lib/             # Utilities (CSV, backup, risk calculations)
-│   │   ├── state/           # React Context (AppContext)
-│   │   ├── App.jsx          # Root component with routing
-│   │   ├── main.jsx         # Entry point
-│   │   └── index.css        # Tailwind imports
-│   ├── public/              # Static assets (icons, manifest)
-│   ├── index.html           # HTML template
-│   ├── vite.config.js       # Vite configuration (base path, PWA)
-│   ├── package.json         # Dependencies and scripts
-│   ├── tailwind.config.js   # Tailwind configuration
-│   ├── postcss.config.js    # PostCSS configuration
-│   └── dist/                # Production build (generated)
+├── src/
+│   ├── pages/              # Page components (Dashboard, ClassDetail, etc.)
+│   ├── components/         # Reusable components (Modal, Dropdown, etc.)
+│   ├── db/                 # IndexedDB setup (Dexie)
+│   ├── lib/                # Utilities (CSV, backup, risk calculations)
+│   ├── state/              # React Context (AppContext)
+│   ├── App.jsx             # Root component with routing
+│   ├── main.jsx            # Entry point
+│   └── index.css           # Tailwind imports
+├── public/                 # Static assets (icons, manifest)
+├── index.html              # HTML template
+├── vite.config.js          # Vite configuration (base path, PWA)
+├── package.json            # Dependencies and scripts
+├── tailwind.config.js      # Tailwind configuration
+├── postcss.config.js       # PostCSS configuration
+├── dist/                   # Production build (generated)
 ├── .github/workflows/
-│   └── deploy.yml           # GitHub Actions deployment workflow
-├── .gitignore               # Git ignore rules
-└── README.md                # This file
+│   └── deploy.yml          # GitHub Actions deployment workflow
+├── .gitignore              # Git ignore rules
+└── README.md               # This file
 ```
 
 ### Available Scripts
