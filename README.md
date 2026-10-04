@@ -191,7 +191,7 @@ In **Settings → Local Data**:
 
 ### Automatic Deployment (GitHub Actions)
 
-Pushing to the `master` branch automatically:
+Pushing to the `main` branch automatically:
 1. Installs dependencies
 2. Builds the production application
 3. Deploys to GitHub Pages
@@ -199,7 +199,7 @@ Pushing to the `master` branch automatically:
 
 **GitHub Actions Workflow:**
 - Located in `.github/workflows/deploy.yml`
-- Runs on every push to `master` branch
+- Runs on every push to `main` branch
 - Uses Node.js 20, npm, and official GitHub Pages actions
 
 ### Enabling GitHub Pages in Your Repository
@@ -210,7 +210,7 @@ If not already enabled:
 2. Under "Build and deployment":
    - Source: `GitHub Actions`
 3. Save
-4. GitHub Actions will automatically deploy the next push to `master`
+4. GitHub Actions will automatically deploy the next push to `main`
 
 ### Configuration Details
 
