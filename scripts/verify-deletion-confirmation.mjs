@@ -10,6 +10,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const checks = [];
 
@@ -24,13 +25,13 @@ function test(name, pass, details = '') {
 console.log('\n🔍 FEATURE VERIFICATION: Enhanced Deletion Confirmation\n' + '='.repeat(70));
 
 // Test 1: Settings.jsx has new state variables
-const settingsFile = fs.readFileSync('./src/pages/Settings.jsx', 'utf-8');
+const settingsFile = fs.readFileSync(fileURLToPath(new URL('../src/pages/Settings.jsx', import.meta.url)), 'utf-8');
 test('Settings.jsx has clearConfirmCode state', settingsFile.includes('clearConfirmCode'));
 test('Settings.jsx has clearUserInput state', settingsFile.includes('clearUserInput'));
 test('Settings.jsx generates random code', settingsFile.includes('Math.random() * 9000) + 1000'));
 
 // Test 2: Modal.jsx has enhanced Confirm component
-const modalFile = fs.readFileSync('./src/components/Modal.jsx', 'utf-8');
+const modalFile = fs.readFileSync(fileURLToPath(new URL('../src/components/Modal.jsx', import.meta.url)), 'utf-8');
 test('Modal.jsx Confirm accepts confirmCode prop', modalFile.includes('confirmCode'));
 test('Modal.jsx Confirm accepts userInput prop', modalFile.includes('userInput'));
 test('Modal.jsx Confirm accepts onInputChange prop', modalFile.includes('onInputChange'));

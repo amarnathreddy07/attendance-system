@@ -113,7 +113,7 @@ console.log('='.repeat(70));
 console.log('\n🔧 IMPLEMENTATION DETAILS\n');
 
 const changes = `
-File: client/src/pages/Settings.jsx
+File: src/pages/Settings.jsx
 
 Updated onConfirm handler:
   1. try {

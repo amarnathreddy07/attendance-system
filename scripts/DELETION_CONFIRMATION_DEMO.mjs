@@ -4,7 +4,7 @@
  */
 
 const testSteps = [
-  "1. Navigate to http://127.0.0.1:5173/attendance-system/#/settings",
+  "1. Navigate to http://localhost:5173/#/settings",
   "2. Scroll down to 'Local Data' section",
   "3. Click 'Clear All Local Data' button",
   "4. A confirmation modal will appear with:",
@@ -36,13 +36,13 @@ console.log("=".repeat(60) + "\n");
 
 console.log("🔧 IMPLEMENTATION DETAILS:\n");
 console.log("Modified Files:");
-console.log("  • client/src/pages/Settings.jsx");
+console.log("  • src/pages/Settings.jsx");
 console.log("    - Added clearConfirmCode state");
 console.log("    - Added clearUserInput state");
 console.log("    - Generate random 4-digit code on button click");
 console.log("    - Pass code and input to Confirm component");
 console.log("");
-console.log("  • client/src/components/Modal.jsx");
+console.log("  • src/components/Modal.jsx");
 console.log("    - Enhanced Confirm component");
 console.log("    - Added confirmCode prop");
 console.log("    - Added userInput and onInputChange props");

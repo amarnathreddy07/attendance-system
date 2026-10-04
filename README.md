@@ -97,22 +97,17 @@ No installation required. Works in any modern browser.
    cd attendance-system
    ```
 
-2. **Navigate to the client directory:**
-   ```bash
-   cd client
-   ```
-
-3. **Install dependencies:**
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-4. **Start the development server:**
+3. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-5. **Open in your browser:**
+4. **Open in your browser:**
    - Vite will print the URL (usually `http://localhost:5173`)
    - The application loads with hash-based routing
 
@@ -121,7 +116,6 @@ No installation required. Works in any modern browser.
 Build the application for production:
 
 ```bash
-cd client
 npm run build        # Creates optimized build in dist/
 npm run preview      # Serves the production build locally
 ```
@@ -221,8 +215,9 @@ If not already enabled:
 ### Configuration Details
 
 **Vite Base Path:**
-- Configured in `vite.config.js`: `base: '/attendance-system/'`
+- Configured in `vite.config.js`: production builds use `base: '/attendance-system/'`, the dev server uses `/`
 - Ensures all assets load correctly from the GitHub Pages subpath
+- Override for other hosts: `BASE_PATH=/ npm run build`
 
 **Routing:**
 - Uses HashRouter for compatibility with GitHub Pages
@@ -232,7 +227,7 @@ If not already enabled:
 **Asset Paths:**
 - All relative paths in index.html and vite.config.js
 - PWA manifest uses relative icon paths
-- Service worker navigateFallback configured for the correct base path
+- Service worker navigateFallback is derived from the same `base` value
 
 ---
 
@@ -298,28 +293,30 @@ All data remains in IndexedDB and is accessible from the installed app.
 
 ```
 attendance-system/
-├── client/                   # Frontend application
-│   ├── src/
-│   │   ├── pages/           # Page components (Dashboard, ClassDetail, etc.)
-│   │   ├── components/      # Reusable components (Modal, Dropdown, etc.)
-│   │   ├── db/              # IndexedDB setup (Dexie)
-│   │   ├── lib/             # Utilities (CSV, backup, risk calculations)
-│   │   ├── state/           # React Context (AppContext)
-│   │   ├── App.jsx          # Root component with routing
-│   │   ├── main.jsx         # Entry point
-│   │   └── index.css        # Tailwind imports
-│   ├── public/              # Static assets (icons, manifest)
-│   ├── index.html           # HTML template
-│   ├── vite.config.js       # Vite configuration (base path, PWA)
-│   ├── package.json         # Dependencies and scripts
-│   ├── tailwind.config.js   # Tailwind configuration
-│   ├── postcss.config.js    # PostCSS configuration
-│   └── dist/                # Production build (generated)
+├── src/
+│   ├── pages/           # Page components (Dashboard, ClassDetail, etc.)
+│   ├── components/      # Reusable components (Modal, Dropdown, etc.)
+│   ├── db/              # IndexedDB setup (Dexie)
+│   ├── lib/             # Utilities (CSV, backup, risk calculations)
+│   ├── state/           # React Context (AppContext)
+│   ├── App.jsx          # Root component with routing
+│   ├── main.jsx         # Entry point
+│   └── index.css        # Tailwind imports
+├── scripts/             # Node verification / test scripts
+├── public/              # Static assets (icons, manifest)
+├── docs/                # Architecture documentation
+├── index.html           # HTML template
+├── vite.config.js       # Vite configuration (base path, PWA)
+├── package.json         # Dependencies and scripts
+├── tailwind.config.js   # Tailwind configuration
+├── postcss.config.js    # PostCSS configuration
 ├── .github/workflows/
-│   └── deploy.yml           # GitHub Actions deployment workflow
-├── .gitignore               # Git ignore rules
-└── README.md                # This file
+│   └── deploy.yml       # GitHub Actions deployment workflow
+├── .gitignore           # Git ignore rules
+└── README.md            # This file
 ```
+
+The repository contains no backend: `src/` is the whole application and lives at the root of the repository.
 
 ### Available Scripts
 
@@ -330,7 +327,20 @@ npm run dev              # Start dev server on localhost:5173
 # Production
 npm run build            # Build production bundle
 npm run preview          # Preview production build locally
+
+# Tests
+npm test                 # Run scripts/test-logic.mjs and scripts/test-attendance.mjs
 ```
+
+### Browser Scripts
+
+`scripts/probe.mjs`, `scripts/probe2.mjs`, `scripts/probe-shortcuts.mjs`, `scripts/e2e-smoke.mjs` and
+`scripts/smoke-test-complete.mjs` drive a real browser against the dev server. They expect:
+
+- `npm run dev` already running (override with `DEV_URL=http://localhost:5173`)
+- a local Chrome/Chromium, auto-detected per platform, or `CHROME_PATH=/path/to/chrome`
+- `puppeteer-core` installed for the `*.mjs` probe/e2e scripts (`npm i -D puppeteer-core`)
+- `playwright` installed for `scripts/smoke-test-complete.mjs`
 
 ### Database Schema
 

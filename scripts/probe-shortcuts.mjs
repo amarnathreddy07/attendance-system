@@ -1,7 +1,8 @@
 import puppeteer from 'puppeteer-core';
+import { DEV_URL, resolveChromePath } from './browser.mjs';
 
-const CHROME = 'C:/Users/Amarnath Reddy/AppData/Local/Google/Chrome/Application/chrome.exe';
-const BASE = 'http://localhost:5173/attendance-system/';
+const CHROME = resolveChromePath();
+const BASE = DEV_URL;
 
 let failures = 0;
 const ok = (name, cond, extra = '') => {
