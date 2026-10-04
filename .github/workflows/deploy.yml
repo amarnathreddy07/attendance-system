@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - master
 
 permissions:
   contents: read
@@ -30,12 +30,10 @@ jobs:
           cache-dependency-path: 'package-lock.json'
       
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       
       - name: Build
         run: npm run build
-        env:
-          BASE_PATH: '/attendance-system/'
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

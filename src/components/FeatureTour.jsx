@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 import { Icons, Icon } from './icons.jsx';
 
 const TOUR_STEPS = [
@@ -40,43 +40,91 @@ const TOUR_STEPS = [
   },
 ];
 
-function TourOverlay({ step, onNext, onSkip, onPrev, total, current }) {
-  const targetRef = useRef(null);
-  const tooltipRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+const GAP = 12;
+const EDGE = 12;
 
-  useEffect(() => {
+function TourOverlay({ step, onNext, onSkip, onPrev, total, current }) {
+  const tooltipRef = useRef(null);
+  const [pos, setPos] = useState(null);
+
+  useLayoutEffect(() => {
     const el = document.querySelector(`[data-tour="${step.target}"]`);
     if (!el) {
       onNext();
       return;
     }
-    targetRef.current = el;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    const rect = el.getBoundingClientRect();
-    const gap = 12;
-    let top, left;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    setPos(null);
 
-    switch (step.placement) {
-      case 'bottom':
-        top = rect.bottom + gap;
-        left = rect.left + rect.width / 2;
-        break;
-      case 'top':
-        top = rect.top - gap;
-        left = rect.left + rect.width / 2;
-        break;
-      case 'left':
-        top = rect.top + rect.height / 2;
-        left = rect.left - gap;
-        break;
-      default:
-        top = rect.bottom + gap;
-        left = rect.left + rect.width / 2;
-    }
+    const update = () => {
+      const tip = tooltipRef.current;
+      if (!tip) return;
 
-    setPos({ top, left });
+      const target = el.getBoundingClientRect();
+      const tipRect = tip.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      let place = step.placement;
+      const fitsTop = target.top - GAP - tipRect.height - EDGE >= 0;
+      const fitsBottom = target.bottom + GAP + tipRect.height + EDGE <= vh;
+      const fitsLeft = target.left - GAP - tipRect.width - EDGE >= 0;
+      const fitsRight = target.right + GAP + tipRect.width + EDGE <= vw;
+
+      if (place === 'top' && !fitsTop && fitsBottom) place = 'bottom';
+      else if (place === 'bottom' && !fitsBottom && fitsTop) place = 'top';
+      else if (place === 'left' && !fitsLeft && fitsRight) place = 'right';
+
+      let top;
+      let left;
+      if (place === 'top') {
+        top = target.top - GAP - tipRect.height;
+        left = target.left + target.width / 2 - tipRect.width / 2;
+      } else if (place === 'left') {
+        top = target.top + target.height / 2 - tipRect.height / 2;
+        left = target.left - GAP - tipRect.width;
+      } else if (place === 'right') {
+        top = target.top + target.height / 2 - tipRect.height / 2;
+        left = target.right + GAP;
+      } else {
+        top = target.bottom + GAP;
+        left = target.left + target.width / 2 - tipRect.width / 2;
+      }
+
+      top = Math.min(Math.max(top, EDGE), Math.max(EDGE, vh - tipRect.height - EDGE));
+      left = Math.min(Math.max(left, EDGE), Math.max(EDGE, vw - tipRect.width - EDGE));
+
+      setPos((prev) =>
+        prev && Math.abs(prev.top - top) < 0.5 && Math.abs(prev.left - left) < 0.5
+          ? prev
+          : { top, left }
+      );
+      return { top, left };
+    };
+
+    let raf = 0;
+    let stableFrames = 0;
+    let last = null;
+    const loop = () => {
+      const next = update();
+      if (last && next && Math.abs(last.top - next.top) < 0.5 && Math.abs(last.left - next.left) < 0.5) {
+        stableFrames += 1;
+      } else {
+        stableFrames = 0;
+      }
+      last = next;
+      if (stableFrames < 6) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
   }, [step]);
 
   return (
@@ -84,17 +132,8 @@ function TourOverlay({ step, onNext, onSkip, onPrev, total, current }) {
       <div className="absolute inset-0 bg-black/40" onClick={onSkip} />
       <div
         ref={tooltipRef}
-        className="fade-in absolute z-[101] w-72 rounded-xl bg-white p-4 shadow-xl"
-        style={{
-          top: pos.top,
-          left: pos.left,
-          transform:
-            step.placement === 'top'
-              ? 'translate(-50%, -100%)'
-              : step.placement === 'left'
-              ? 'translate(-100%, -50%)'
-              : 'translate(-50%, 0)',
-        }}
+        className={`fade-in absolute z-[101] w-72 max-w-[calc(100vw-24px)] rounded-xl bg-white p-4 shadow-xl ${pos ? '' : 'invisible opacity-0'}`}
+        style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0 }}
       >
         <p className="text-sm font-bold text-slate-900">{step.title}</p>
         <p className="mt-1 text-xs text-slate-600">{step.text}</p>

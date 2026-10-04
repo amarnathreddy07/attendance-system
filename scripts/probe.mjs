@@ -1,7 +1,8 @@
 import puppeteer from 'puppeteer-core';
+import { DEV_URL, resolveChromePath } from './browser.mjs';
 
-const CHROME = 'C:/Users/Amarnath Reddy/AppData/Local/Google/Chrome/Application/chrome.exe';
-const BASE = 'http://localhost:5173';
+const CHROME = resolveChromePath();
+const BASE = DEV_URL;
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,

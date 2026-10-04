@@ -6,6 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const results = [];
 const errors = [];
@@ -27,7 +28,7 @@ function searchInFile(filePath, patterns) {
   }
 }
 
-const srcDir = './src';
+const srcDir = fileURLToPath(new URL('../src', import.meta.url));
 const pagesDir = path.join(srcDir, 'pages');
 const libDir = path.join(srcDir, 'lib');
 const dbDir = path.join(srcDir, 'db');

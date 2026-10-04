@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import * as fs from 'fs';
 
-const BASE_URL = 'http://127.0.0.1:5173';
+const BASE_URL = process.env.DEV_URL || 'http://localhost:5173';
 const results = [];
 
 async function log(message) {

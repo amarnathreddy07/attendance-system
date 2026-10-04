@@ -1,9 +1,10 @@
 node_modules
 dist
 dist-ssr
-.vite
+.vite/
 *.local
 *.log
+feature-verification.txt
 .DS_Store
 .env
 .env.*

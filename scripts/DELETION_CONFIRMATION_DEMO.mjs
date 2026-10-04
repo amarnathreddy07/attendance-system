@@ -4,7 +4,7 @@
  */
 
 const testSteps = [
-  "1. Navigate to http://127.0.0.1:5173/#/settings",
+  "1. Navigate to http://localhost:5173/#/settings",
   "2. Scroll down to 'Local Data' section",
   "3. Click 'Clear All Local Data' button",
   "4. A confirmation modal will appear with:",
