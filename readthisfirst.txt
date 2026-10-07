@@ -1,0 +1,35 @@
+Only a small set of values are manual — the code itself is complete and needs no hand-editing. Nothing in src/, apps-script/, or package.json requires you to type anything.
+1. Google Cloud Console (browser)
+- APIs & Services → OAuth consent screen: External, app name, support email, add yourself under Test users (or Internal if on Workspace).
+- Credentials → Create credentials → OAuth client ID → Web application:
+- Authorised JavaScript origins: http://localhost:5173 and https://<your-github-username>.github.io
+- Copy the client ID → value A
+- Enable the Google Identity Services (it's client-side only; no API enablement needed for ID-token sign-in).
+2. Google Sheet (browser)
+- Import docs/attendit-database-template.xlsx with Replace spreadsheet.
+- Share → Restricted.
+- Copy the ID from the URL → value B.
+- Add seed rows to the Teachers tab only (header already present):
+teacher_id	name	email	role
+tch_you	Your Real Name	you@university.edu (mailto:you@university.edu)	admin
+Your email must be the Google account you'll sign in with. role = teacher or admin. active = TRUE.
+3. Apps Script (browser)
+- script.google.com → New project → paste the 9 files in the order listed in apps-script/SETUP.md §2.4–2.5.
+- Run ping_ once (creates tabs/headers, authorise when prompted).
+- Project Settings → Script Properties — enter these three:
+- SPREADSHEET_ID = value B
+- GOOGLE_CLIENT_ID = value A
+- ORG_EMAIL_DOMAIN = optional, e.g. university.edu
+- (SESSION_TTL_HOURS optional, default 24; SESSION_SECRET leave blank — auto-generated)
+- Deploy → New deployment → Web app → Execute as Me, access Anyone (or domain) → authorise → copy the URL → value C.
+4. Frontend (local file you create)
+cp .env.example .env
+Then edit .env — these two lines are the only codebase edits you'll ever make:
+VITE_GOOGLE_CLIENT_ID=<value A>
+VITE_API_URL=<value C>
+Commit .env is ignored by git (.gitignore already covers it).
+5. GitHub (manual, one-time)
+Default branch is still master and the deploy workflow targets main. Your account y-bow has write but not admin, so this must be done by the repo owner (or someone with admin):
+- Settings → General → Default branch → main → Change default.
+- Then delete the stale master branch (remote + local).
+Until this is done, pushes to main still trigger CI, but the repo's default-branch badge/PRs will point at master.

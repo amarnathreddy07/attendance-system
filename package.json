@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-logic.mjs && node scripts/test-attendance.mjs"
+    "test": "node scripts/test-logic.mjs && node scripts/test-attendance.mjs && npm run test:apps-script",
+    "test:apps-script": "node --test apps-script/test/*.test.mjs"
   },
   "dependencies": {
     "dexie": "^4.0.8",

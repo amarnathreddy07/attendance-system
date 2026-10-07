@@ -3,7 +3,6 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-d
 import { useApp } from './state/AppContext.jsx';
 import Layout from './components/Layout.jsx';
 import Toasts from './components/Toasts.jsx';
-import Onboarding from './pages/Onboarding.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ClassSetup from './pages/ClassSetup.jsx';
 import ClassDetail from './pages/ClassDetail.jsx';
@@ -15,6 +14,9 @@ import SessionDetail from './pages/SessionDetail.jsx';
 import StudentHistory from './pages/StudentHistory.jsx';
 import Settings from './pages/Settings.jsx';
 import Faq from './pages/Faq.jsx';
+import Login from './pages/Login.jsx';
+import Admin from './pages/Admin.jsx';
+import { useAuth } from './state/AuthContext.jsx';
 
 function OnlineWatcher() {
   const { setOnline } = useApp();
@@ -33,11 +35,19 @@ function OnlineWatcher() {
 }
 
 function Gate({ children }) {
+  const { ready } = useAuth();
   const { teacher } = useApp();
   const location = useLocation();
-  if (teacher === undefined) return null;
-  if (!teacher && location.pathname !== '/onboarding') return <Navigate to="/onboarding" replace />;
-  if (teacher && location.pathname === '/onboarding') return <Navigate to="/" replace />;
+  if (!ready) return null;
+  if (!teacher && location.pathname !== '/login') return <Navigate to="/login" replace />;
+  if (teacher && location.pathname === '/login') return <Navigate to="/" replace />;
+  return children;
+}
+
+function AdminGuard({ children }) {
+  const { isAdmin, ready } = useAuth();
+  if (!ready) return null;
+  if (!isAdmin) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -48,10 +58,10 @@ export default function App() {
       <Toasts />
       <Routes>
         <Route
-          path="/onboarding"
+          path="/login"
           element={
             <Gate>
-              <Onboarding />
+              <Login />
             </Gate>
           }
         />
@@ -74,6 +84,14 @@ export default function App() {
           <Route path="/classes/:id/students/:studentId" element={<StudentHistory />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/faq" element={<Faq />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminGuard>
+                <Admin />
+              </AdminGuard>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

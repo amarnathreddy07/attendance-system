@@ -68,3 +68,13 @@
 .fade-in {
   animation: fadeIn 0.18s ease-out;
 }
+
+/* Google Identity Services renders its button asynchronously; keep the slot
+   sized so the form does not jump while it loads. */
+.google-button-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 220px;
+}

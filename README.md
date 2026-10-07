@@ -329,12 +329,13 @@ npm run build            # Build production bundle
 npm run preview          # Preview production build locally
 
 # Tests
-npm test                 # Run scripts/test-logic.mjs and scripts/test-attendance.mjs
+npm test                 # Frontend logic tests + Apps Script backend tests
+npm run test:apps-script # Apps Script backend only
 ```
 
 ### Browser Scripts
 
-`scripts/probe.mjs`, `scripts/probe2.mjs`, `scripts/probe-shortcuts.mjs`, `scripts/e2e-smoke.mjs` and
+`scripts/probe.mjs`, `scripts/probe2.mjs`, `scripts/probe-shortcuts.mjs` and
 `scripts/smoke-test-complete.mjs` drive a real browser against the dev server. They expect:
 
 - `npm run dev` already running (override with `DEV_URL=http://localhost:5173`)
@@ -344,16 +345,34 @@ npm test                 # Run scripts/test-logic.mjs and scripts/test-attendanc
 
 ### Database Schema
 
-Dexie with IndexedDB (v4 schema):
+Dexie with IndexedDB (v8 schema):
 
 ```
-- teachers:              Teacher profile (id, name, email)
-- classes:              Classes (id, class_name, section, attendance_threshold, created_at)
-- students:             Students (id, class_id, name, roll_number, application_number, email, status)
-- attendance_sessions:  Sessions (id, class_id, date, status, submitted_at)
-- attendance_records:   Individual marks (id, attendance_session_id, student_id, status)
-- settings:             App settings (key-value store)
+- teachers:              Signed-in teacher (id = backend teacher_id, name, email, role)
+- classes:               Classes (id = backend class_id, class_name, section, threshold)
+- students:              Students (id = backend student_id, class_id, name, identifiers, status)
+- attendance_sessions:   Sessions (id, class_id, date, status, submitted_at)
+- attendance_records:    Marks (id, attendance_session_id, student_id, status)
+- sync_queue:            Offline queue (id = client_operation_id, class_id, records, sync_status)
+- settings:              App settings (key-value store)
 ```
+
+Rows created before the first backend sync are matched by application/roll
+number and inherit the backend id, so nothing typed offline is discarded.
+
+### Backend
+
+Attendance is written through a Google Apps Script Web App into Google Sheets.
+See `apps-script/SETUP.md` for deployment and `docs/DATA_MODEL.md` for the
+sheet schema. The frontend talks to the backend with:
+
+```
+VITE_GOOGLE_CLIENT_ID=<OAuth web client id>
+VITE_API_URL=<Apps Script web app URL>
+```
+
+Copy `.env.example` to `.env` and fill in both values. Role, class access and
+teacher status are decided by the backend against the `Teachers` sheet.
 
 ### Key Dependencies
 

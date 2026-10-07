@@ -76,4 +76,17 @@ db.version(7).stores({
   attendance_records: 'id, attendance_session_id, student_id, status, [attendance_session_id+student_id]',
 });
 
+// v8: re-adds the offline sync queue now that attendance is written through
+// the Apps Script backend. Each queued row carries a client_operation_id that
+// the backend uses as its idempotency key.
+db.version(8).stores({
+  settings: 'key',
+  teachers: 'id',
+  classes: 'id, name, class_name, created_at, year, semester',
+  students: 'id, class_id, status, [class_id+status], [class_id+application_number]',
+  attendance_sessions: 'id, class_id, date, status, [class_id+date], [class_id+status]',
+  attendance_records: 'id, attendance_session_id, student_id, status, [attendance_session_id+student_id]',
+  sync_queue: 'id, class_id, sync_status, [class_id+sync_status], created_at',
+});
+
 export default db;

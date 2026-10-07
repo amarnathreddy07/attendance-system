@@ -1,12 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useRef, useState } from 'react';
 import db from '../db/db.js';
-import {
-  getTeacher,
-  updateTeacher,
-} from '../db/repositories.js';
 import { exportBackup, downloadBackup, importBackup } from '../lib/backup.js';
 import { useApp } from '../state/AppContext.jsx';
+import { useAuth } from '../state/AuthContext.jsx';
 import InstallApp from '../components/InstallApp.jsx';
 import { PageHeader } from '../components/ui.jsx';
 import Modal, { Confirm } from '../components/Modal.jsx';
@@ -23,12 +19,9 @@ function Section({ title, subtitle, children }) {
 }
 
 export default function Settings() {
-  const { pushToast } = useApp();
-  const teacher = useLiveQuery(() => getTeacher(), []);
+  const { pushToast, teacher, isAdmin, pendingSync, syncNow } = useApp();
+  const { signOut } = useAuth();
 
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importError, setImportError] = useState('');
   const [clearOpen, setClearOpen] = useState(false);
@@ -37,48 +30,78 @@ export default function Settings() {
   const [clearUserInput, setClearUserInput] = useState('');
   const fileRef = useRef(null);
 
-  useEffect(() => {
-    if (teacher) {
-      setName(teacher.name || '');
-      setEmail(teacher.email || '');
-    }
-  }, [teacher]);
-
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      <PageHeader title="Settings" subtitle="Your teacher profile and local data." />
+      <PageHeader title="Settings" subtitle="Your account, local data and sync status." />
 
       <div className="space-y-5">
-        <Section title="Teacher Profile" subtitle="Stored only on this device.">
+        <Section
+          title="Account"
+          subtitle="Your role and class access are managed by an administrator on the server."
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="set-name">Teacher Name</label>
-              <input id="set-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+              <p className="label">Name</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900">
+                {teacher?.name || '—'}
+              </p>
             </div>
             <div>
-              <label className="label" htmlFor="set-email">Email (optional)</label>
-              <input id="set-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <p className="label">Email</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {teacher?.email || '—'}
+              </p>
+            </div>
+            <div>
+              <p className="label">Role</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium capitalize text-slate-900">
+                {teacher?.role || '—'}
+                {isAdmin ? ' · full admin access' : ''}
+              </p>
+            </div>
+            <div>
+              <p className="label">Offline queue</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {pendingSync > 0
+                  ? `${pendingSync} change${pendingSync === 1 ? '' : 's'} waiting to sync`
+                  : 'Everything is synced'}
+              </p>
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end gap-2">
             <button
-              className="btn-primary"
-              disabled={savingProfile || !name.trim()}
+              className="btn-secondary"
               onClick={async () => {
-                setSavingProfile(true);
                 try {
-                  await updateTeacher({ name, email });
-                  pushToast({ type: 'success', title: 'Profile updated' });
+                  const result = await syncNow();
+                  pushToast({
+                    type: result.failed ? 'error' : 'success',
+                    title: result.failed ? 'Some changes could not sync' : 'Sync complete',
+                    message:
+                      result.failed > 0
+                        ? `${result.failed} item(s) are queued and will retry automatically.`
+                        : `${result.synced} change(s) sent to the class sheet.`,
+                  });
                 } catch (err) {
-                  pushToast({ type: 'error', title: 'Could not save', message: err.message });
-                } finally {
-                  setSavingProfile(false);
+                  pushToast({ type: 'error', title: 'Sync failed', message: err.message });
                 }
               }}
             >
-              {savingProfile ? 'Saving…' : 'Save Profile'}
+              Sync now
+            </button>
+            <button
+              className="btn-primary"
+              onClick={async () => {
+                await signOut();
+              }}
+            >
+              Sign out
             </button>
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Profile changes (name, role, class access) are made by an administrator in the Admin area or
+            directly in the class sheet.
+          </p>
         </Section>
 
         <Section title="Local Data" subtitle="Your data lives in this browser. Back it up regularly.">
@@ -144,11 +167,13 @@ export default function Settings() {
           <ul className="space-y-2 text-sm text-slate-600">
             <li className="flex items-start gap-2">
               <Icon d={Icons.lock} className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-              Teacher profile, classes, students and attendance are stored in this browser only (IndexedDB).
+              Attendance is written to the class sheet through the AttendIt backend after you sign in.
+              Classes, students and history are cached in this browser (IndexedDB) for offline use.
             </li>
             <li className="flex items-start gap-2">
               <Icon d={Icons.info} className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-              Everything stays on this device. No account is required, and no data is ever sent to any server.
+              Changes made offline stay queued on this device until they sync. Nothing is deleted silently —
+              failed syncs are retried and can be reviewed in the offline queue.
             </li>
           </ul>
         </Section>

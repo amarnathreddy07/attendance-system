@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { getTeacher } from '../db/repositories.js';
+import { useAuth } from './AuthContext.jsx';
 
 const AppContext = createContext(null);
 
@@ -14,7 +13,8 @@ export function AppProvider({ children }) {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [toasts, setToasts] = useState([]);
 
-  const teacher = useLiveQuery(() => getTeacher(), []);
+  // Teacher/session now comes from the backend session (AuthContext).
+  const auth = useAuth();
 
   const pushToast = useCallback(({ type = 'success', title, message }) => {
     const id = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -25,11 +25,14 @@ export function AppProvider({ children }) {
   }, []);
 
   const value = {
-    teacher,
+    teacher: auth.teacher,
+    isAdmin: auth.isAdmin,
     online,
     setOnline,
     pushToast,
     toasts,
+    syncNow: auth.syncNow,
+    pendingSync: auth.pendingSync,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -90,16 +90,77 @@ export default function ClassSetup() {
       if (!classId) {
         const created = await addClass({ class_name: name, section, year, semester, attendance_threshold: threshold });
         classId = created.id;
+        // Mirror the class into the backend so it can own attendance.
+        try {
+          const { api } = await import('../lib/apiClient.js');
+          await api.createClass({
+            class_name: name,
+            section,
+            subject: klass?.subject || '',
+            year,
+            semester,
+            attendance_threshold: threshold,
+          });
+        } catch (err) {
+          if (err?.code !== 'OFFLINE') {
+            // Non-fatal: the class stays local and will reconcile on next sync.
+            console.warn('Backend class create failed:', err?.message || err);
+          }
+        }
       } else {
         await updateClass(classId, { class_name: name, section, year, semester, attendance_threshold: threshold });
+        try {
+          const { api } = await import('../lib/apiClient.js');
+          await api.updateClass({
+            class_id: klass?.backend_class_id || classId,
+            class_name: name,
+            section,
+            year,
+            semester,
+            attendance_threshold: threshold,
+          });
+        } catch (err) {
+          if (err?.code !== 'OFFLINE') {
+            console.warn('Backend class update failed:', err?.message || err);
+          }
+        }
       }
       await bulkImportStudents(classId, students);
+      // Mirror the roster into the backend (best-effort; reconciled on sync).
+      try {
+        const { api } = await import('../lib/apiClient.js');
+        const payload = students.map((s) => ({
+          application_number: s.application_number || '',
+          roll_number: s.roll_number || '',
+          prn_number: s.prn_number || '',
+          name: s.name,
+          email: s.email || '',
+          status: s.status || 'active',
+        }));
+        await api.importStudents(klass?.backend_class_id || classId, payload);
+      } catch (err) {
+        if (err?.code !== 'OFFLINE') {
+          console.warn('Backend roster import failed:', err?.message || err);
+        }
+      }
+      // Pull backend ids down so local rows and the sheet stay aligned.
+      try {
+        const { syncDown } = await import('../lib/cacheSync.js');
+        await syncDown();
+      } catch {
+        /* offline is fine — queue handles it */
+      }
       pushToast({
         type: 'success',
         title: 'Students imported',
         message: `${students.length} student${students.length === 1 ? '' : 's'} saved locally.`,
       });
-      navigate(`/classes/${classId}`);
+      // After syncDown the class may carry the backend id — navigate to the live row.
+      const { default: db } = await import('../db/db.js');
+      const live = (await db.classes.toArray()).find(
+        (row) => row.class_name === name && (row.section || '') === (section || '')
+      );
+      navigate(`/classes/${live?.id || classId}`);
     } catch (err) {
       setError(err.message);
       pushToast({ type: 'error', title: 'Import failed', message: err.message });
@@ -140,10 +201,47 @@ export default function ClassSetup() {
     try {
       if (editing) {
         await updateClass(id, { class_name: name, section, year, semester, attendance_threshold: threshold });
+        try {
+          const { api } = await import('../lib/apiClient.js');
+          await api.updateClass({
+            class_id: klass?.backend_class_id || id,
+            class_name: name,
+            section,
+            year,
+            semester,
+            attendance_threshold: threshold,
+          });
+        } catch (err) {
+          if (err?.code !== 'OFFLINE') console.warn('Backend class update failed:', err?.message || err);
+        }
         navigate(`/classes/${id}`);
       } else {
         const created = await addClass({ class_name: name, section, year, semester, attendance_threshold: threshold });
-        navigate(`/classes/${created.id}`);
+        try {
+          const { api } = await import('../lib/apiClient.js');
+          await api.createClass({
+            class_name: name,
+            section,
+            subject: klass?.subject || '',
+            year,
+            semester,
+            attendance_threshold: threshold,
+          });
+        } catch (err) {
+          if (err?.code !== 'OFFLINE') console.warn('Backend class create failed:', err?.message || err);
+        }
+        try {
+          const { syncDown } = await import('../lib/cacheSync.js');
+          await syncDown();
+        } catch {
+          /* offline */
+        }
+        // syncDown may have adopted the backend id — navigate to the live row.
+        const { default: db } = await import('../db/db.js');
+        const live = (await db.classes.toArray()).find(
+          (row) => row.class_name === name && (row.section || '') === (section || '')
+        );
+        navigate(`/classes/${live?.id || created.id}`);
       }
     } finally {
       setBusy(false);

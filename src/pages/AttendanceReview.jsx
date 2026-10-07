@@ -61,10 +61,24 @@ export default function AttendanceReview() {
       setSubmitting(true);
       try {
         await markSessionSubmitted(session.id);
+        const { enqueueAttendanceSubmit, flushSyncQueue } = await import('../lib/syncQueue.js');
+        await enqueueAttendanceSubmit({
+          classId: id,
+          sessionId: session.id,
+          date: session.date,
+          records: list.map((student) => ({
+            student_id: student.id,
+            status: student.status || RECORD_STATUS.PRESENT,
+          })),
+        });
+        const outcome = await flushSyncQueue();
         pushToast({
           type: 'success',
-          title: 'Attendance saved locally',
-          message: 'All records are stored on this device.',
+          title: outcome.failed ? 'Saved locally, will sync' : 'Attendance submitted',
+          message:
+            outcome.failed > 0
+              ? 'The backend was unreachable. Your records are queued and will retry automatically.'
+              : 'Attendance is recorded in the class sheet.',
         });
         navigate(`/classes/${id}/history`);
       } finally {
