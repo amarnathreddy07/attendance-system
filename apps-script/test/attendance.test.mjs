@@ -185,6 +185,21 @@ test('a teacher cannot submit attendance for a class they do not own', () => {
   assert.equal(backend.spreadsheet.table('Sessions').rows.length, 0);
 });
 
+test('an assigned teacher can submit attendance for a shared class', () => {
+  const data = seed();
+  data.ClassTeachers.push([OTHER_CLASS_ID, TEACHER_ID, '2026-01-01T00:00:00.000Z']);
+  const backend = createBackend({ data });
+  const result = submit(backend, teacherSession(backend, 'alice@example.edu'), {
+    class_id: OTHER_CLASS_ID,
+    records: [{ student_id: 'stu_9', status: 'P' }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(backend.spreadsheet.table('Sessions').rows.length, 1);
+  assert.equal(backend.spreadsheet.table('Sessions').rows[0][3], TEACHER_ID);
+  assert.equal(backend.spreadsheet.table('Attendance').rows.length, 1);
+});
+
 test('an admin may submit attendance for any class', () => {
   const backend = createBackend({ data: seed() });
   const result = submit(backend, teacherSession(backend, 'admin@example.edu'), {

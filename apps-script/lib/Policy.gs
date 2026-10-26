@@ -1,5 +1,5 @@
 /**
- * Authorization policy — pure functions, no Apps Script globals.
+ * Authorization policy.
  *
  * The frontend is untrusted: it never sends a role, and it never gets to say
  * which teacher owns a class. Every protected handler resolves the caller from
@@ -57,7 +57,7 @@ function requireClassAccess_(user, klass) {
   if (!klass) {
     throw appError_('NOT_FOUND', 'That class no longer exists.');
   }
-  if (!canAccessClass_(user, klass)) {
+  if (!canAccessClass_(user, klass) && !isTeacherAssignedToClass_(user, klass)) {
     throw appError_('UNAUTHORIZED', 'You are not authorized to access this class.');
   }
   return klass;

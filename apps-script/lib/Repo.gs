@@ -84,17 +84,27 @@ function listClassesFor_(user) {
   if (isAdmin_(user)) return getTable_(SHEETS.CLASSES).slice();
 
   var teacherId = normalizeId_(user.teacher_id);
-  var assigned = {};
-  getTable_(SHEETS.CLASS_TEACHERS).forEach(function (row) {
-    if (normalizeId_(row.teacher_id) === teacherId) {
-      assigned[normalizeId_(row.class_id)] = true;
-    }
-  });
+  var assigned = listClassIdsAssignedToTeacher_(teacherId);
 
   return getTable_(SHEETS.CLASSES).filter(function (klass) {
     var classId = normalizeId_(klass.class_id);
     return normalizeId_(klass.teacher_id) === teacherId || assigned[classId] === true;
   });
+}
+
+function listClassIdsAssignedToTeacher_(teacherId) {
+  var assigned = {};
+  getTable_(SHEETS.CLASS_TEACHERS).forEach(function (row) {
+    if (normalizeId_(row.teacher_id) === normalizeId_(teacherId)) {
+      assigned[normalizeId_(row.class_id)] = true;
+    }
+  });
+  return assigned;
+}
+
+function isTeacherAssignedToClass_(user, klass) {
+  if (!user || user.role !== ROLES.TEACHER || !klass) return false;
+  return listClassIdsAssignedToTeacher_(user.teacher_id)[normalizeId_(klass.class_id)] === true;
 }
 
 function listActiveClassesFor_(user) {
