@@ -50,20 +50,6 @@ export function AuthProvider({ children }) {
     return count;
   }, []);
 
-  const expireSession = useCallback(async (error) => {
-    const expiredToken = error.sessionToken;
-    if (!expiredToken || getSessionToken() !== expiredToken) return;
-
-    resetSession();
-    if (mounted.current) {
-      setUser(null);
-      setAuthError(error.message);
-    }
-    if ((await getSetting(TOKEN_KEY)) === expiredToken) {
-      await setSetting(TOKEN_KEY, null);
-    }
-  }, []);
-
   const syncNow = useCallback(() => {
     const sessionToken = getSessionToken();
     if (syncInFlight.current) {
@@ -75,12 +61,6 @@ export function AuthProvider({ children }) {
       const result = await flushSyncQueue();
       if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
       await refreshPending();
-      const authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
-      if (authError) {
-        const error = new ApiError(authError.code, authError.message);
-        error.sessionToken = sessionToken;
-        await expireSession(error);
-      }
       if (result.synced > 0) {
         syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
       }
@@ -92,7 +72,7 @@ export function AuthProvider({ children }) {
     });
     syncInFlight.current = { sessionToken, promise };
     return promise;
-  }, [expireSession, refreshPending]);
+  }, [refreshPending]);
 
   /** Restores a stored session and validates it against the backend. */
   const bootstrap = useCallback(async () => {
