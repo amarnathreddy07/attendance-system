@@ -2,7 +2,7 @@ Only a small set of values are manual — the code itself is complete and needs 
 1. Google Cloud Console (browser)
 - APIs & Services → OAuth consent screen: External, app name, support email, add yourself under Test users (or Internal if on Workspace).
 - Credentials → Create credentials → OAuth client ID → Web application:
-- Authorised JavaScript origins: http://localhost:5173 and https://<your-github-username>.github.io
+- Authorised JavaScript origins: http://localhost:5173 and https://<your-project>.vercel.app
 - Copy the client ID → value A
 - Enable the Google Identity Services (it's client-side only; no API enablement needed for ID-token sign-in).
 2. Google Sheet (browser)

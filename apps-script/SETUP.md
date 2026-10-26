@@ -65,7 +65,7 @@ Project Settings → Script Properties:
    teachers as test users, or switch to Internal on Workspace).
 3. Credentials → Create credentials → **OAuth client ID** → **Web application**.
 4. Authorised JavaScript origins: your deployed frontend origin,
-   e.g. `https://amarnathreddy07.github.io` and `http://localhost:5173`.
+   e.g. `https://your-project.vercel.app` and `http://localhost:5173`.
 5. Copy the client id into:
    - Script Property `GOOGLE_CLIENT_ID` on the backend, and
    - `VITE_GOOGLE_CLIENT_ID` on the frontend (`.env`, not committed).

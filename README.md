@@ -2,7 +2,7 @@
 
 A local-first, offline-friendly attendance management application for teachers. All data is stored privately on your device using the browser's IndexedDB database. No account required, no cloud backend, no server.
 
-**Deployed on GitHub Pages:** [https://amarnath1564.github.io/attendance-system/](https://amarnath1564.github.io/attendance-system/)
+**Deployment:** Vercel
 
 ---
 
@@ -42,7 +42,7 @@ A local-first, offline-friendly attendance management application for teachers. 
 ## 🏗️ Tech Stack
 
 - **Frontend Framework:** React 18 with Vite 5
-- **Routing:** React Router 6 (HashRouter for GitHub Pages compatibility)
+- **Routing:** React Router 6 (HashRouter)
 - **Local Database:** Dexie (IndexedDB wrapper) with dexie-react-hooks for reactive queries
 - **Styling:** Tailwind CSS 3
 - **PWA:** vite-plugin-pwa with Workbox service worker
@@ -84,7 +84,7 @@ Use the **Local Data** section in Settings to:
 Open the deployed application:
 
 ```
-https://amarnath1564.github.io/attendance-system/
+Your Vercel deployment URL.
 ```
 
 No installation required. Works in any modern browser.
@@ -187,47 +187,17 @@ In **Settings → Local Data**:
 
 ---
 
-## 🌐 GitHub Pages Deployment
+## Deploying to Vercel
 
-### Automatic Deployment (GitHub Actions)
+Import the repository into Vercel and use the default Vite settings:
 
-Pushing to the `main` branch automatically:
-1. Installs dependencies
-2. Builds the production application
-3. Deploys to GitHub Pages
-4. Application is live at `https://amarnath1564.github.io/attendance-system/`
+- Build command: `npm run build`
+- Output directory: `dist`
 
-**GitHub Actions Workflow:**
-- Located in `.github/workflows/deploy.yml`
-- Runs on every push to `main` branch
-- Uses Node.js 20, npm, and official GitHub Pages actions
-
-### Enabling GitHub Pages in Your Repository
-
-If not already enabled:
-
-1. Go to **Settings → Pages**
-2. Under "Build and deployment":
-   - Source: `GitHub Actions`
-3. Save
-4. GitHub Actions will automatically deploy the next push to `main`
-
-### Configuration Details
-
-**Vite Base Path:**
-- Configured in `vite.config.js`: production builds use `base: '/attendance-system/'`, the dev server uses `/`
-- Ensures all assets load correctly from the GitHub Pages subpath
-- Override for other hosts: `BASE_PATH=/ npm run build`
-
-**Routing:**
-- Uses HashRouter for compatibility with GitHub Pages
-- All routes are prefixed with `#/` (e.g., `/#/classes/1`)
-- No server-side configuration needed
-
-**Asset Paths:**
-- All relative paths in index.html and vite.config.js
-- PWA manifest uses relative icon paths
-- Service worker navigateFallback is derived from the same `base` value
+Vite builds the app at the site root, as required by Vercel.
+If using Google sign-in and the Apps Script backend, configure
+`VITE_GOOGLE_CLIENT_ID` and `VITE_API_URL` in the Vercel project's environment
+variables, then redeploy.
 
 ---
 
@@ -263,7 +233,7 @@ All data remains in IndexedDB and is accessible from the installed app.
 ### Application won't load
 - Check browser compatibility (Chrome, Edge, Firefox, Safari all supported)
 - Clear browser cache and reload
-- Ensure you're on the correct URL: `https://amarnath1564.github.io/attendance-system/`
+- Ensure you're using the production URL shown in your Vercel project.
 
 ### Data disappeared
 - Check that you're using the same device/browser where you created your profile
@@ -434,4 +404,3 @@ For questions or support:
 **Last Updated:** August 14, 2026  
 **Version:** 1.2.0  
 **Status:** Production Ready
-
