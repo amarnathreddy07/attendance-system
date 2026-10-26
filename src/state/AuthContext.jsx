@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, setSessionToken, resetSession } from '../lib/apiClient.js';
+import { api, ApiError, getSessionToken, setSessionToken, resetSession } from '../lib/apiClient.js';
 import { renderGoogleButton, unmountGoogleButton } from '../lib/googleAuth.js';
 import { flushSyncQueue, pendingCount } from '../lib/syncQueue.js';
 import { syncDown } from '../lib/cacheSync.js';
@@ -51,16 +51,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   const expireSession = useCallback(async (error) => {
+    const expiredToken = error.sessionToken;
+    if (!expiredToken || getSessionToken() !== expiredToken) return;
+
     resetSession();
     if (mounted.current) {
       setUser(null);
       setAuthError(error.message);
     }
-    await setSetting(TOKEN_KEY, null);
+    if ((await getSetting(TOKEN_KEY)) === expiredToken) {
+      await setSetting(TOKEN_KEY, null);
+    }
   }, []);
 
   const syncNow = useCallback(() => {
-    if (syncInFlight.current) return syncInFlight.current;
+    const sessionToken = getSessionToken();
+    if (syncInFlight.current) {
+      if (syncInFlight.current.sessionToken === sessionToken) return syncInFlight.current.promise;
+      return syncInFlight.current.promise.catch(() => {}).then(() => syncNow());
+    }
 
     const sync = (async () => {
       const result = await flushSyncQueue();
@@ -68,7 +77,9 @@ export function AuthProvider({ children }) {
       await refreshPending();
       const authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
       if (authError) {
-        await expireSession(new ApiError(authError.code, authError.message));
+        const error = new ApiError(authError.code, authError.message);
+        error.sessionToken = sessionToken;
+        await expireSession(error);
       }
       if (result.synced > 0) {
         syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
@@ -76,10 +87,11 @@ export function AuthProvider({ children }) {
       return result;
     })();
 
-    syncInFlight.current = sync.finally(() => {
-      syncInFlight.current = null;
+    const promise = sync.finally(() => {
+      if (syncInFlight.current?.promise === promise) syncInFlight.current = null;
     });
-    return syncInFlight.current;
+    syncInFlight.current = { sessionToken, promise };
+    return promise;
   }, [expireSession, refreshPending]);
 
   /** Restores a stored session and validates it against the backend. */
