@@ -9,6 +9,7 @@ A local-first, offline-friendly attendance management application for teachers. 
 ## ✨ Features
 
 ### Core Functionality
+
 - **Teacher Profile** — Create a simple profile on first launch (name and optional email).
 - **Class Management** — Create, edit, and manage multiple classes.
 - **Student Management** — Add students manually or import a CSV roster.
@@ -17,6 +18,7 @@ A local-first, offline-friendly attendance management application for teachers. 
 - **Session Details** — Review, edit, and resubmit attendance sessions.
 
 ### Advanced Features
+
 - **Presentation Mode** — Full-screen display for classroom projectors with touch/keyboard controls.
 - **Keyboard Shortcuts** — Fast attendance marking with keyboard:
   - `→` or `Enter` = Mark Present
@@ -54,7 +56,8 @@ A local-first, offline-friendly attendance management application for teachers. 
 ## 💾 Data & Privacy
 
 ### How It Works
-All attendance data (teacher profile, classes, students, sessions, records) is stored **locally in your browser** using IndexedDB. 
+
+All attendance data (teacher profile, classes, students, sessions, records) is stored **locally in your browser** using IndexedDB.
 
 - **No cloud storage.** Data never leaves your device.
 - **No analytics.** Your attendance data is not tracked or analyzed.
@@ -62,14 +65,17 @@ All attendance data (teacher profile, classes, students, sessions, records) is s
 - **No backend.** The deployed application is purely a frontend SPA.
 
 ### Clearing Browser Data
+
 If you clear browser data, local application data will be permanently deleted. **Always export and keep a backup** of your attendance records.
 
 Use the **Local Data** section in Settings to:
+
 - Export a backup (downloads to your computer)
 - Import a previously exported backup
 - Clear all local data (with automatic backup)
 
 ### Security & Backups
+
 - Backups are JSON files downloaded to your computer.
 - Backups are never uploaded anywhere.
 - You have full control over backup files.
@@ -92,22 +98,23 @@ No installation required. Works in any modern browser.
 ### Local Development
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/amarnath1564/attendance-system.git
    cd attendance-system
    ```
-
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
-
 3. **Start the development server:**
+
    ```bash
    npm run dev
    ```
-
 4. **Open in your browser:**
+
    - Vite will print the URL (usually `http://localhost:5173`)
    - The application loads with hash-based routing
 
@@ -125,19 +132,24 @@ npm run preview      # Serves the production build locally
 ## 📖 Using the App
 
 ### 1. Onboarding
+
 On first launch, enter your teacher name and optional email. This creates your local profile.
 
 ### 2. Create a Class
+
 From the Dashboard, click **Add Class**:
+
 - Enter class name
 - Optionally add section/group
 - Set attendance threshold (default 75%)
 - Import students or create the class first
 
 ### 3. Import Students
+
 Upload a CSV file or use the sample generator:
 
 **CSV format (any column order):**
+
 ```
 Application Number, Roll Number, Student Name, Email, Status
 001, 1, Alice Johnson, alice@example.com, active
@@ -145,6 +157,7 @@ Application Number, Roll Number, Student Name, Email, Status
 ```
 
 Supported headers (case-insensitive):
+
 - Application Number / App Number / ID
 - Roll Number / Roll / Roll No
 - Student Name / Name / First Name
@@ -152,7 +165,9 @@ Supported headers (case-insensitive):
 - Status (optional; defaults to active)
 
 ### 4. Take Attendance
+
 From a class, click **Take Attendance**:
+
 - Mark each student Present (✓) or Absent (✗)
 - Use keyboard shortcuts for fast marking
 - See progress bar and real-time counts
@@ -160,7 +175,9 @@ From a class, click **Take Attendance**:
 - Submit to save locally
 
 ### 5. Presentation Mode
+
 During attendance, click **Presentation Mode**:
+
 - Full-screen dark display
 - Large student name and roll number
 - Progress tracking
@@ -168,19 +185,25 @@ During attendance, click **Presentation Mode**:
 - Exit with Escape key
 
 ### 6. Review Attendance
+
 After marking all students, review the list:
+
 - Toggle Present/Absent for any student
 - Quick "Review Absent Students" filter
 - Submit to save
 
 ### 7. Attendance History
+
 From a class, view **Attendance History**:
+
 - Monthly calendar of attendance sessions
 - Click a date to view that session
 - Per-student attendance history
 
 ### 8. Export & Backup
+
 In **Settings → Local Data**:
+
 - **Export Local Data** — Download a JSON backup of everything
 - **Import Local Data** — Restore from a previous backup
 - **Clear All Local Data** — Delete everything (requires 4-digit code; auto-backs up first)
@@ -206,11 +229,13 @@ variables, then redeploy.
 The application is a Progressive Web App (PWA):
 
 ### On Desktop (Chrome/Edge/Opera)
+
 1. Click the install icon (address bar or menu)
 2. Click "Install"
 3. App opens in a window without browser UI
 
 ### On Mobile (Android)
+
 1. Open in Chrome
 2. Tap the menu (three dots)
 3. Tap "Install app" or "Add to home screen"
@@ -218,6 +243,7 @@ The application is a Progressive Web App (PWA):
 5. App is added to home screen
 
 ### On iOS/Safari
+
 1. Open in Safari
 2. Tap Share
 3. Tap "Add to Home Screen"
@@ -231,26 +257,31 @@ All data remains in IndexedDB and is accessible from the installed app.
 ## 🔧 Troubleshooting
 
 ### Application won't load
+
 - Check browser compatibility (Chrome, Edge, Firefox, Safari all supported)
 - Clear browser cache and reload
 - Ensure you're using the production URL shown in your Vercel project.
 
 ### Data disappeared
+
 - Check that you're using the same device/browser where you created your profile
 - Clearing browser data deletes IndexedDB
 - Use a backup to restore: Settings → Local Data → Import
 
 ### Keyboard shortcuts not working
+
 - Make sure no input fields are focused
 - Shortcuts are disabled when typing in forms
 - Try clicking the main attendance card first
 
 ### CSV import failed
+
 - Ensure column headers match expected names (case-insensitive)
 - Check for duplicate student IDs (skipped automatically)
 - Email field is optional; Name, Roll Number, App Number are required
 
 ### Offline mode not working
+
 - Open the app online at least once to cache service worker
 - Check browser settings for service worker support
 - Some browsers limit PWA functionality in private/incognito mode
@@ -349,10 +380,10 @@ account status are decided by the backend using the separate `Teachers` and
 
 The backend keeps teachers and administrators in separate tabs:
 
-| Sheet | ID column | Format | Sequence |
-| --- | --- | --- | --- |
+| Sheet        | ID column      | Format                         | Sequence                     |
+| ------------ | -------------- | ------------------------------ | ---------------------------- |
 | `Teachers` | `teacher_id` | `TCH-0001`, `TCH-0002`, … | Independent teacher sequence |
-| `Admins` | `admin_id` | `ADM-0001`, `ADM-0002`, … | Independent admin sequence |
+| `Admins`   | `admin_id`   | `ADM-0001`, `ADM-0002`, … | Independent admin sequence   |
 
 IDs are assigned by the backend when an admin adds an account. Do not assign an
 ID already in use or change the script properties that store the next sequence.
@@ -370,17 +401,17 @@ Because the migration assigns new IDs, all users must sign in again afterward.
 
 ### Key Dependencies
 
-| Package | Version | Purpose |
-| --- | --- | --- |
-| react | ^18.3.1 | UI library |
-| react-dom | ^18.3.1 | DOM rendering |
-| react-router-dom | ^6.26.2 | Routing |
-| dexie | ^4.0.8 | IndexedDB wrapper |
-| dexie-react-hooks | ^1.1.7 | Reactive hooks for Dexie |
-| tailwindcss | ^3.4.10 | Styling |
-| vite | ^5.4.3 | Build tool |
-| @vitejs/plugin-react | ^4.3.1 | React plugin for Vite |
-| vite-plugin-pwa | ^1.3.0 | PWA generation |
+| Package              | Version | Purpose                  |
+| -------------------- | ------- | ------------------------ |
+| react                | ^18.3.1 | UI library               |
+| react-dom            | ^18.3.1 | DOM rendering            |
+| react-router-dom     | ^6.26.2 | Routing                  |
+| dexie                | ^4.0.8  | IndexedDB wrapper        |
+| dexie-react-hooks    | ^1.1.7  | Reactive hooks for Dexie |
+| tailwindcss          | ^3.4.10 | Styling                  |
+| vite                 | ^5.4.3  | Build tool               |
+| @vitejs/plugin-react | ^4.3.1  | React plugin for Vite    |
+| vite-plugin-pwa      | ^1.3.0  | PWA generation           |
 
 ---
 
@@ -405,7 +436,7 @@ If you encounter bugs:
 
 ## 🙏 Contributing
 
-Contributions are welcome! 
+Contributions are welcome!
 
 - Fork the repository
 - Create a feature branch
@@ -419,12 +450,13 @@ Please keep the application local-first and avoid introducing cloud dependencies
 ## 📞 Support
 
 For questions or support:
+
 - Check this README
 - Review the Troubleshooting section
 - Open an issue on GitHub
 
 ---
 
-**Last Updated:** August 14, 2026  
-**Version:** 1.2.0  
+**Last Updated:** August 14, 2026
+**Version:** 1.2.0
 **Status:** Production Ready
