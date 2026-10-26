@@ -35,6 +35,7 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [syncState, setSyncState] = useState({ pending: 0, lastResult: null });
   const mounted = useRef(true);
+  const syncInFlight = useRef(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -49,14 +50,23 @@ export function AuthProvider({ children }) {
     return count;
   }, []);
 
-  const syncNow = useCallback(async () => {
-    const result = await flushSyncQueue();
-    if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
-    await refreshPending();
-    if (result.synced > 0) {
-      syncDown().catch(() => {});
-    }
-    return result;
+  const syncNow = useCallback(() => {
+    if (syncInFlight.current) return syncInFlight.current;
+
+    const sync = (async () => {
+      const result = await flushSyncQueue();
+      if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
+      await refreshPending();
+      if (result.synced > 0) {
+        syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
+      }
+      return result;
+    })();
+
+    syncInFlight.current = sync.finally(() => {
+      syncInFlight.current = null;
+    });
+    return syncInFlight.current;
   }, [refreshPending]);
 
   /** Restores a stored session and validates it against the backend. */
@@ -93,8 +103,10 @@ export function AuthProvider({ children }) {
       const data = await api.getCurrentUser();
       if (!mounted.current) return;
       setUser(data.user);
+      // Drain queued writes as soon as a stored session is restored.
+      syncNow().catch((error) => console.error('Automatic sync failed.', error));
       // Populate the Dexie cache from the backend (best-effort).
-      syncDown().catch(() => {});
+      syncDown().catch((error) => console.error('Could not refresh local data.', error));
     } catch (error) {
       resetSession();
       await setSetting(TOKEN_KEY, null);
@@ -102,21 +114,40 @@ export function AuthProvider({ children }) {
     } finally {
       if (mounted.current) setReady(true);
     }
-  }, []);
+  }, [syncNow]);
 
   useEffect(() => {
     bootstrap();
   }, [bootstrap]);
 
-  // Flush the queue whenever the tab comes back online.
+  // Retry pending writes on reconnect, when the app is reopened, and after
+  // temporary server failures while the browser remains online.
   useEffect(() => {
-    const goOnline = () => {
-      syncNow();
+    const trySync = () => {
+      if (user && navigator.onLine && document.visibilityState === 'visible') {
+        syncNow().catch((error) => console.error('Automatic sync failed.', error));
+      }
+    };
+    const goOnline = () => trySync();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') trySync();
     };
     window.addEventListener('online', goOnline);
-    refreshPending();
-    return () => window.removeEventListener('online', goOnline);
-  }, [syncNow, refreshPending]);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    refreshPending()
+      .then((count) => {
+        if (count > 0) trySync();
+      })
+      .catch((error) => console.error('Could not read the sync queue.', error));
+    const interval = window.setInterval(() => {
+      if (syncState.pending > 0) trySync();
+    }, 30_000);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.clearInterval(interval);
+    };
+  }, [user, syncNow, refreshPending, syncState.pending]);
 
   const completeSignIn = useCallback(async (idToken) => {
     setSigningIn(true);

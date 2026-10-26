@@ -18,7 +18,7 @@ export default function AttendanceReview() {
   const { id, sessionId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { pushToast } = useApp();
+  const { pushToast, syncNow } = useApp();
 
   const session = useLiveQuery(() => getSession(sessionId), [sessionId]);
   const students = useLiveQuery(() => getStudentsForClass(id, { includeInactive: false }), [id]);
@@ -61,7 +61,7 @@ export default function AttendanceReview() {
       setSubmitting(true);
       try {
         await markSessionSubmitted(session.id);
-        const { enqueueAttendanceSubmit, flushSyncQueue } = await import('../lib/syncQueue.js');
+        const { enqueueAttendanceSubmit } = await import('../lib/syncQueue.js');
         await enqueueAttendanceSubmit({
           classId: id,
           sessionId: session.id,
@@ -71,7 +71,7 @@ export default function AttendanceReview() {
             status: item.status || RECORD_STATUS.PRESENT,
           })),
         });
-        const outcome = await flushSyncQueue();
+        const outcome = await syncNow();
         pushToast({
           type: 'success',
           title: outcome.failed ? 'Saved locally, will sync' : 'Attendance submitted',
