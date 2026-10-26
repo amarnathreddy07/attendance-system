@@ -111,16 +111,29 @@ export async function enqueueAttendanceUpdate({ records, reason, clientOperation
 }
 
 async function markSynced(row) {
-  await db.sync_queue.put({ ...row, sync_status: SYNC_STATUS.SYNCED, last_error: null, updated_at: nowIso() });
+  await db.transaction('rw', db.sync_queue, async () => {
+    const current = await db.sync_queue.get(row.id);
+    await db.sync_queue.put({
+      ...(current || row),
+      sync_status: SYNC_STATUS.SYNCED,
+      last_error: null,
+      updated_at: nowIso(),
+    });
+  });
 }
 
 async function markFailed(row, error) {
-  await db.sync_queue.put({
-    ...row,
-    sync_status: SYNC_STATUS.FAILED,
-    attempts: (row.attempts || 0) + 1,
-    last_error: error?.message || String(error),
-    updated_at: nowIso(),
+  await db.transaction('rw', db.sync_queue, async () => {
+    const current = await db.sync_queue.get(row.id);
+    if (current?.sync_status === SYNC_STATUS.SYNCED) return;
+    const latest = current || row;
+    await db.sync_queue.put({
+      ...latest,
+      sync_status: SYNC_STATUS.FAILED,
+      attempts: (latest.attempts || 0) + 1,
+      last_error: error?.message || String(error),
+      updated_at: nowIso(),
+    });
   });
 }
 

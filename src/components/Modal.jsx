@@ -102,9 +102,12 @@ export function Confirm({
         <button
           className={danger ? 'btn-danger' : 'btn-primary'}
           disabled={requiresCode && !codeMatches}
-          onClick={() => {
-            onConfirm();
-            onClose();
+          onClick={async () => {
+            try {
+              await Promise.resolve(onConfirm?.());
+            } finally {
+              onClose();
+            }
           }}
         >
           {confirmLabel}

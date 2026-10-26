@@ -214,7 +214,7 @@ function updateRowsByIndex_(name, entries) {
 }
 
 function updateRow_(name, indexedRow) {
-  updateRowsByIndex_(name, [{ __row: indexedRow.__row, row: indexedRow }]);
+  updateRowsByIndex_(name, [indexedRow]);
 }
 
 function indexBy_(rows, key) {

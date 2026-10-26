@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/apiClient.js';
 import { parseCsv } from '../lib/sample.js';
 import { parseStudentRows } from '../lib/studentSheet.js';
 import { useApp } from '../state/AppContext.jsx';
 import { PageHeader, Spinner, EmptyState } from '../components/ui.jsx';
 import { Icons, Icon } from '../components/icons.jsx';
+import Modal from '../components/Modal.jsx';
 
 const TABS = [
   { id: 'teachers', label: 'Teachers' },
@@ -14,16 +15,29 @@ const TABS = [
   { id: 'reports', label: 'Reports' },
 ];
 
-function ErrorNote({ error }) {
+function ErrorNote({ error, onRetry }) {
   if (!error) return null;
-  return <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>;
+  return (
+    <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
+      <span>{error}</span>
+      {onRetry && (
+        <button type="button" className="font-semibold underline underline-offset-2" onClick={onRetry}>
+          Try again
+        </button>
+      )}
+    </div>
+  );
 }
 
-function PeopleTab({ role, pushToast }) {
+function PeopleTab({ role, pushToast, currentUserId }) {
   const [people, setPeople] = useState(null);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '' });
   const [busy, setBusy] = useState(false);
+  const [changingId, setChangingId] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '' });
+  const [editError, setEditError] = useState('');
 
   const load = async () => {
     try {
@@ -32,7 +46,6 @@ function PeopleTab({ role, pushToast }) {
       setError('');
     } catch (err) {
       setError(err.message);
-      setPeople([]);
     }
   };
 
@@ -43,6 +56,7 @@ function PeopleTab({ role, pushToast }) {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
+    setError('');
     try {
       await api.adminCreateTeacher({
         name: form.name.trim(),
@@ -61,6 +75,8 @@ function PeopleTab({ role, pushToast }) {
   };
 
   const toggleActive = async (person) => {
+    setChangingId(person.teacher_id);
+    setError('');
     try {
       await api.adminUpdateTeacher({
         teacher_id: person.teacher_id,
@@ -75,19 +91,53 @@ function PeopleTab({ role, pushToast }) {
       await load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setChangingId('');
+    }
+  };
+
+  const editPerson = (person) => {
+    setEditing(person);
+    setEditForm({ name: person.name, email: person.email });
+    setEditError('');
+  };
+
+  const savePerson = async (event) => {
+    event.preventDefault();
+    if (!editing) return;
+    setChangingId(editing.teacher_id);
+    setEditError('');
+    try {
+      await api.adminUpdateTeacher({
+        teacher_id: editing.teacher_id,
+        role,
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+      });
+      pushToast({ type: 'success', title: `${role === 'admin' ? 'Admin' : 'Teacher'} updated` });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setChangingId('');
     }
   };
 
   return (
     <div className="space-y-6">
       <form onSubmit={submit} className="card p-5">
-        <h3 className="mb-4 text-base font-semibold text-slate-900">
-          Add {role === 'admin' ? 'an admin' : 'a teacher'}
-        </h3>
+          <div className="mb-4">
+          <h2 className="text-base font-bold text-slate-900">
+            Add {role === 'admin' ? 'an admin' : 'a teacher'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">New accounts can sign in with their listed Google account.</p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <input
             className="input"
             placeholder="Full name"
+            aria-label="Full name"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             required
@@ -96,6 +146,7 @@ function PeopleTab({ role, pushToast }) {
             className="input"
             type="email"
             placeholder="name@university.edu"
+            aria-label="Email address"
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             required
@@ -104,11 +155,11 @@ function PeopleTab({ role, pushToast }) {
             {busy ? 'Adding…' : `Add ${role === 'admin' ? 'admin' : 'teacher'}`}
           </button>
         </div>
-        <ErrorNote error={error} />
+        <ErrorNote error={error} onRetry={load} />
       </form>
 
       {people === null ? (
-        <Spinner />
+        error ? null : <Spinner />
       ) : people.length === 0 ? (
         <EmptyState
           icon={Icons.clipboard}
@@ -126,7 +177,7 @@ function PeopleTab({ role, pushToast }) {
                   <th className="px-4 py-2.5">Email</th>
                   {role === 'teacher' && <th className="px-4 py-2.5">Classes</th>}
                   <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5 text-right">Access</th>
+                  <th className="px-4 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -148,13 +199,31 @@ function PeopleTab({ role, pushToast }) {
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
-                        type="button"
-                        className={person.active ? 'btn-secondary py-1 text-xs' : 'btn-primary py-1 text-xs'}
-                        onClick={() => toggleActive(person)}
-                      >
-                        {person.active ? 'Suspend' : 'Restore'}
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="btn-secondary py-1 text-xs"
+                          onClick={() => editPerson(person)}
+                          disabled={!!changingId}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className={person.active ? 'btn-secondary py-1 text-xs' : 'btn-primary py-1 text-xs'}
+                          onClick={() => toggleActive(person)}
+                          disabled={!!changingId || (role === 'admin' && person.teacher_id === currentUserId && person.active)}
+                          title={role === 'admin' && person.teacher_id === currentUserId ? 'You cannot suspend your own account.' : undefined}
+                        >
+                          {changingId === person.teacher_id
+                            ? 'Saving…'
+                            : role === 'admin' && person.teacher_id === currentUserId && person.active
+                              ? 'Current account'
+                              : person.active
+                                ? 'Suspend'
+                                : 'Restore'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -163,24 +232,73 @@ function PeopleTab({ role, pushToast }) {
           </div>
         </div>
       )}
+
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={`Edit ${role === 'admin' ? 'admin' : 'teacher'}`}
+        size="sm"
+      >
+        <form onSubmit={savePerson} className="space-y-4">
+          <div>
+            <label className="label" htmlFor="edit-person-name">Full name</label>
+            <input
+              id="edit-person-name"
+              className="input"
+              value={editForm.name}
+              onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+              required
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="edit-person-email">Email</label>
+            <input
+              id="edit-person-email"
+              className="input"
+              type="email"
+              value={editForm.email}
+              onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))}
+              required
+            />
+          </div>
+              <ErrorNote error={editError} />
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={() => setEditing(null)}>Cancel</button>
+            <button className="btn-primary" disabled={!!changingId}>
+              {changingId ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
 
 function ClassesTab({ pushToast }) {
   const [classes, setClasses] = useState(null);
+  const [teachers, setTeachers] = useState([]);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ class_name: '', section: '', subject: '', year: '', semester: '' });
+  const [form, setForm] = useState({
+    class_name: '',
+    section: '',
+    subject: '',
+    year: '',
+    semester: '',
+    teacher_id: '',
+    attendance_threshold: '75',
+  });
   const [busy, setBusy] = useState(false);
+  const [busyClassId, setBusyClassId] = useState('');
+  const [assignmentSelection, setAssignmentSelection] = useState({});
 
   const load = async () => {
     try {
-      const data = await api.adminGetClasses();
-      setClasses(data.classes);
+      const [classData, peopleData] = await Promise.all([api.adminGetClasses(), api.adminGetTeachers()]);
+      setClasses(classData.classes);
+      setTeachers(peopleData.teachers);
       setError('');
     } catch (err) {
       setError(err.message);
-      setClasses([]);
     }
   };
 
@@ -191,6 +309,7 @@ function ClassesTab({ pushToast }) {
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
+    setError('');
     try {
       await api.adminCreateClass({
         class_name: form.class_name.trim(),
@@ -198,8 +317,18 @@ function ClassesTab({ pushToast }) {
         subject: form.subject.trim(),
         year: form.year.trim(),
         semester: form.semester.trim(),
+        teacher_id: form.teacher_id,
+        attendance_threshold: Number(form.attendance_threshold),
       });
-      setForm({ class_name: '', section: '', subject: '', year: '', semester: '' });
+      setForm({
+        class_name: '',
+        section: '',
+        subject: '',
+        year: '',
+        semester: '',
+        teacher_id: '',
+        attendance_threshold: '75',
+      });
       pushToast({ type: 'success', title: 'Class created' });
       await load();
     } catch (err) {
@@ -209,51 +338,101 @@ function ClassesTab({ pushToast }) {
     }
   };
 
+  const saveAssignment = async (klass) => {
+    const selectedId = assignmentSelection[klass.class_id] ?? klass.teacher_id ?? '';
+    const currentId = klass.teacher_id || '';
+    if (selectedId === currentId) return;
+
+    setBusyClassId(klass.class_id);
+    setError('');
+    try {
+      if (selectedId) {
+        await api.adminAssignTeacher({
+          class_id: klass.class_id,
+          teacher_id: selectedId,
+          primary: true,
+        });
+      } else if (currentId) {
+        await api.adminAssignTeacher({
+          class_id: klass.class_id,
+          teacher_id: currentId,
+          remove: true,
+        });
+      }
+      pushToast({ type: 'success', title: selectedId ? 'Teacher assigned' : 'Teacher unassigned' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyClassId('');
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <form onSubmit={submit} className="card p-5">
-        <h3 className="mb-4 text-base font-semibold text-slate-900">Create a class</h3>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <input
-            className="input"
-            placeholder="Class name"
-            value={form.class_name}
-            onChange={(e) => setForm((f) => ({ ...f, class_name: e.target.value }))}
-            required
-          />
-          <input
-            className="input"
-            placeholder="Section"
-            value={form.section}
-            onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="Subject"
-            value={form.subject}
-            onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="Year"
-            value={form.year}
-            onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="Semester"
-            value={form.semester}
-            onChange={(e) => setForm((f) => ({ ...f, semester: e.target.value }))}
-          />
-          <button className="btn-primary" disabled={busy}>
-            {busy ? 'Creating…' : 'Create class'}
-          </button>
+      <form onSubmit={submit} className="card p-5 sm:p-6">
+        <div className="mb-5">
+          <h2 className="text-base font-bold text-slate-900">Create a class</h2>
+          <p className="mt-1 text-sm text-slate-500">Set a primary teacher and attendance threshold now, or assign the teacher later.</p>
         </div>
-        <ErrorNote error={error} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="admin-class-name">Class name</label>
+            <input id="admin-class-name" className="input" value={form.class_name}
+              onChange={(e) => setForm((f) => ({ ...f, class_name: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-class-section">Section</label>
+            <input id="admin-class-section" className="input" value={form.section}
+              onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-class-subject">Subject</label>
+            <input id="admin-class-subject" className="input" value={form.subject}
+              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-class-year">Year</label>
+            <input id="admin-class-year" className="input" value={form.year}
+              onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-class-semester">Semester</label>
+            <input id="admin-class-semester" className="input" value={form.semester}
+              onChange={(e) => setForm((f) => ({ ...f, semester: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label" htmlFor="admin-class-threshold">Attendance threshold</label>
+            <div className="relative">
+              <input id="admin-class-threshold" className="input pr-9" type="number" min="0" max="100"
+                value={form.attendance_threshold}
+                onChange={(e) => setForm((f) => ({ ...f, attendance_threshold: e.target.value }))} required />
+              <span className="absolute right-3 top-2.5 text-sm text-slate-400">%</span>
+            </div>
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="label" htmlFor="admin-class-teacher">Primary teacher</label>
+            <select id="admin-class-teacher" className="input" value={form.teacher_id}
+              onChange={(e) => setForm((f) => ({ ...f, teacher_id: e.target.value }))}>
+              <option value="">Leave unassigned</option>
+              {teachers.filter((teacher) => teacher.active).map((teacher) => (
+                <option key={teacher.teacher_id} value={teacher.teacher_id}>
+                  {teacher.name} · {teacher.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
+            <button className="btn-primary" disabled={busy}>
+              {busy ? 'Creating…' : 'Create class'}
+            </button>
+          </div>
+        </div>
+        <ErrorNote error={error} onRetry={load} />
       </form>
 
       {classes === null ? (
-        <Spinner />
+        error ? null : <Spinner />
       ) : classes.length === 0 ? (
         <EmptyState
           icon={Icons.clipboard}
@@ -267,7 +446,7 @@ function ClassesTab({ pushToast }) {
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-2.5">Class</th>
-                  <th className="px-4 py-2.5">Teacher</th>
+                  <th className="px-4 py-2.5">Primary teacher</th>
                   <th className="px-4 py-2.5">Students</th>
                   <th className="px-4 py-2.5">Sessions</th>
                   <th className="px-4 py-2.5">Threshold</th>
@@ -280,10 +459,36 @@ function ClassesTab({ pushToast }) {
                       {klass.class_name}
                       {klass.section ? ` · ${klass.section}` : ''}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-600">
-                      {klass.teacher_name || (
-                        <span className="text-slate-400">Unassigned</span>
-                      )}
+                    <td className="min-w-64 px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="input min-w-0 py-2"
+                          aria-label={`Primary teacher for ${klass.class_name}`}
+                          value={assignmentSelection[klass.class_id] ?? klass.teacher_id ?? ''}
+                          onChange={(event) => setAssignmentSelection((current) => ({
+                            ...current,
+                            [klass.class_id]: event.target.value,
+                          }))}
+                        >
+                          <option value="">Unassigned</option>
+                          {teachers
+                            .filter((teacher) => teacher.active || teacher.teacher_id === klass.teacher_id)
+                            .map((teacher) => (
+                            <option key={teacher.teacher_id} value={teacher.teacher_id}>
+                              {teacher.name}{teacher.active ? '' : ' (inactive)'}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn-secondary shrink-0 px-3 py-2 text-xs"
+                          disabled={busyClassId === klass.class_id ||
+                            (assignmentSelection[klass.class_id] ?? klass.teacher_id ?? '') === (klass.teacher_id || '')}
+                          onClick={() => saveAssignment(klass)}
+                        >
+                          {busyClassId === klass.class_id ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{klass.student_count}</td>
                     <td className="px-4 py-2.5 text-slate-600">{klass.session_count}</td>
@@ -293,6 +498,7 @@ function ClassesTab({ pushToast }) {
               </tbody>
             </table>
           </div>
+          <ErrorNote error={error} onRetry={load} />
         </div>
       )}
     </div>
@@ -304,31 +510,59 @@ function StudentsTab({ pushToast }) {
   const [classId, setClassId] = useState('');
   const [students, setStudents] = useState(null);
   const [error, setError] = useState('');
+  const [classesLoading, setClassesLoading] = useState(true);
   const [importResult, setImportResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
+    let active = true;
     api
       .adminGetClasses()
       .then((data) => {
+        if (!active) return;
         setClasses(data.classes);
-        if (data.classes.length && !classId) setClassId(data.classes[0].class_id);
+        setClassId((current) =>
+          data.classes.some((klass) => klass.class_id === current)
+            ? current
+            : data.classes[0]?.class_id || ''
+        );
       })
-      .catch((err) => setError(err.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch((err) => {
+        if (active) setError(err.message);
+      })
+      .finally(() => {
+        if (active) setClassesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!classId) return;
+    let active = true;
+    if (!classId) {
+      setStudents([]);
+      return () => {
+        active = false;
+      };
+    }
     setStudents(null);
+    setError('');
     api
       .adminGetStudents(classId, 1000)
-      .then((data) => setStudents(data.students))
+      .then((data) => {
+        if (active) setStudents(data.students);
+      })
       .catch((err) => {
-        setError(err.message);
-        setStudents([]);
+        if (active) {
+          setError(err.message);
+          setStudents([]);
+        }
       });
+    return () => {
+      active = false;
+    };
   }, [classId]);
 
   const importFile = async (file) => {
@@ -410,7 +644,9 @@ function StudentsTab({ pushToast }) {
               className="input"
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
+              disabled={classesLoading || busy}
             >
+              {!classes.length && <option value="">No classes available</option>}
               {classes.map((klass) => (
                 <option key={klass.class_id} value={klass.class_id}>
                   {klass.class_name}
@@ -458,7 +694,11 @@ function StudentsTab({ pushToast }) {
         ) : null}
       </div>
 
-      {!classId ? (
+      {classesLoading ? (
+        <Spinner />
+      ) : error && classes.length === 0 ? (
+        null
+      ) : !classId ? (
         <EmptyState
           icon={Icons.clipboard}
           title="No classes yet"
@@ -466,6 +706,8 @@ function StudentsTab({ pushToast }) {
         />
       ) : students === null ? (
         <Spinner />
+      ) : students.length === 0 && error ? (
+        null
       ) : students.length === 0 ? (
         <EmptyState icon={Icons.clipboard} title="No students" message="Import a CSV to add the roster." />
       ) : (
@@ -528,14 +770,21 @@ function ReportsTab() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
 
+  const load = async () => {
+    try {
+      const data = await api.adminReport({});
+      setReport(data.report);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
-    api
-      .adminReport({})
-      .then((data) => setReport(data.report))
-      .catch((err) => setError(err.message));
+    load();
   }, []);
 
-  if (error) return <ErrorNote error={error} />;
+  if (error && report === null) return <ErrorNote error={error} onRetry={load} />;
   if (report === null) return <Spinner />;
   if (!report.length) {
     return (
@@ -603,35 +852,44 @@ function ReportsTab() {
 
 export default function Admin() {
   const [tab, setTab] = useState('teachers');
-  const { pushToast } = useApp();
+  const { pushToast, teacher } = useApp();
 
-  const body = useMemo(() => {
-    if (tab === 'teachers') return <PeopleTab role="teacher" pushToast={pushToast} />;
-    if (tab === 'admins') return <PeopleTab role="admin" pushToast={pushToast} />;
-    if (tab === 'classes') return <ClassesTab pushToast={pushToast} />;
-    if (tab === 'students') return <StudentsTab pushToast={pushToast} />;
-    return <ReportsTab />;
-  }, [tab, pushToast]);
+  let body;
+  if (tab === 'teachers') body = <PeopleTab role="teacher" pushToast={pushToast} currentUserId={teacher?.teacher_id} />;
+  else if (tab === 'admins') body = <PeopleTab role="admin" pushToast={pushToast} currentUserId={teacher?.teacher_id} />;
+  else if (tab === 'classes') body = <ClassesTab pushToast={pushToast} />;
+  else if (tab === 'students') body = <StudentsTab pushToast={pushToast} />;
+  else body = <ReportsTab />;
 
   return (
-    <div className="fade-in space-y-6">
+    <div className="fade-in mx-auto max-w-7xl space-y-6 px-4 py-8">
       <PageHeader
-        title="Admin"
-        subtitle="Teachers, classes, rosters and reports — all served from the backend."
+        title="Administration"
+        subtitle="Manage accounts, assign classes, maintain rosters and review attendance."
       />
-      <div className="flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Administration sections" className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-2">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            id={`admin-tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls="admin-tab-panel"
             onClick={() => setTab(item.id)}
-            className={tab === item.id ? 'btn-primary py-2 text-sm' : 'btn-secondary py-2 text-sm'}
+            className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+              tab === item.id
+                ? 'bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
           >
             {item.label}
           </button>
         ))}
       </div>
-      {body}
+      <section id="admin-tab-panel" role="tabpanel" aria-labelledby={`admin-tab-${tab}`}>
+        {body}
+      </section>
     </div>
   );
 }

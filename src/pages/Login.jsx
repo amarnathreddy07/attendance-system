@@ -33,38 +33,45 @@ export default function Login() {
   const message = error || authError || '';
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-50 via-white to-white px-4 py-12">
-      <div className="fade-in w-full max-w-5xl">
-        <div className="grid gap-8 sm:grid-cols-2">
-          <div className="flex flex-col justify-center">
-            <span className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lift">
+    <div className="flex min-h-screen items-center justify-center bg-transparent px-4 py-10 sm:px-6 lg:px-8">
+      <div className="fade-in w-full max-w-6xl">
+        <div className="grid items-center gap-8 rounded-[30px] border border-slate-200/80 bg-white/80 p-4 shadow-lift backdrop-blur-xl sm:p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
+          <div className="flex flex-col justify-center rounded-[26px] bg-gradient-to-br from-brand-50 via-white to-indigo-50 p-6 sm:p-8">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-600/20">
               <Icon d={Icons.clipboard} className="h-8 w-8" />
-            </span>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900">Welcome back</h1>
-            <p className="mt-4 text-lg text-slate-600">
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Welcome back
+            </h1>
+            <p className="mt-4 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
               Sign in with your university Google account. Access is limited to teachers listed by an
               administrator.
             </p>
-            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="flex items-start gap-2 text-sm text-slate-600">
-                <Icon d={Icons.lock} className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+
+            <div className="mt-7 rounded-2xl border border-brand-100 bg-white/80 p-4 shadow-sm">
+              <p className="flex items-start gap-3 text-sm leading-6 text-slate-600">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                  <Icon d={Icons.lock} className="h-4 w-4" />
+                </span>
                 Attendance you mark offline is saved on this device and synced automatically once you are
                 back online.
               </p>
             </div>
           </div>
 
-          <div>
-            <div className="card p-6 sm:p-8">
-              <h2 className="mb-2 text-xl font-bold text-slate-900">Sign In</h2>
-              <p className="mb-6 text-sm text-slate-500">
-                Your role and class access are decided by the server, not by this device.
-              </p>
+          <div className="flex h-full items-center">
+            <div className="card w-full p-6 sm:p-7">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">Sign In</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Your role and class access are decided by the server, not by this device.
+                </p>
+              </div>
 
-              <div className="flex min-h-[44px] items-center justify-center">
+              <div className="flex min-h-[52px] items-center justify-center">
                 <div ref={buttonRef} className="google-button-host" />
                 {signingIn || pending ? (
-                  <p className="text-sm text-slate-500">Signing in…</p>
+                  <p className="ml-3 text-sm font-medium text-slate-500">Signing in…</p>
                 ) : null}
               </div>
 
@@ -88,7 +95,7 @@ export default function Login() {
 
               {message ? <p className="mt-4 text-sm font-medium text-rose-600">{message}</p> : null}
 
-              <p className="mt-6 text-center text-xs text-slate-400">
+              <p className="mt-6 text-center text-xs leading-5 text-slate-400">
                 Signed out devices never lose attendance — it stays queued until this account signs in
                 again.
               </p>

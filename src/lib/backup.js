@@ -1,20 +1,29 @@
 import db from '../db/db.js';
 
+const BACKUP_TABLES = [
+  'teachers',
+  'classes',
+  'students',
+  'attendance_sessions',
+  'attendance_records',
+  'settings',
+  'sync_queue',
+];
+
 export async function exportBackup() {
-  const backup = {
+  const data = {};
+  for (const tableName of BACKUP_TABLES) {
+    const table = db.tables.find((candidate) => candidate.name === tableName);
+    if (!table) continue;
+    data[tableName] = await table.toArray();
+  }
+
+  return {
     app: 'attendit',
     version: 1,
     exported_at: new Date().toISOString(),
-    data: {
-      teachers: await db.teachers.toArray(),
-      classes: await db.classes.toArray(),
-      students: await db.students.toArray(),
-      attendance_sessions: await db.attendance_sessions.toArray(),
-      attendance_records: await db.attendance_records.toArray(),
-      settings: await db.settings.toArray(),
-    },
+    data,
   };
-  return backup;
 }
 
 export function downloadBackup(backup) {
@@ -48,13 +57,14 @@ export async function importBackup(obj) {
     'attendance_sessions',
     'attendance_records',
     'settings',
-  ];
+    'sync_queue',
+  ].filter((tableName) => db.tables.some((table) => table.name === tableName));
 
-  await db.transaction('rw', ...tables.map((t) => db.table(t)), async () => {
-    for (const t of tables) {
-      const rows = Array.isArray(obj.data[t]) ? obj.data[t] : [];
+  await db.transaction('rw', ...tables.map((tableName) => db.table(tableName)), async () => {
+    for (const tableName of tables) {
+      const rows = Array.isArray(obj.data[tableName]) ? obj.data[tableName] : [];
       if (rows.length === 0) continue;
-      await db.table(t).bulkPut(rows);
+      await db.table(tableName).bulkPut(rows);
     }
   });
 

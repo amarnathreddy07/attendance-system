@@ -234,6 +234,9 @@ function handleCreateClass_(ctx) {
     if (ownerId && !owner) {
       throw appError_('VALIDATION_ERROR', 'The selected teacher does not exist.');
     }
+    if (owner && normalizeBoolean_(owner.active) !== true) {
+      throw appError_('VALIDATION_ERROR', 'Only active teachers can be assigned to a class.');
+    }
     var stamp = nowIso_();
     var row = {
       class_id: newId_('cls'),
@@ -351,6 +354,9 @@ function handleAdminAssignTeacher_(ctx) {
     if (!teacher) {
       throw appError_('VALIDATION_ERROR', 'The selected teacher does not exist.');
     }
+    if (ctx.body.remove !== true && normalizeBoolean_(teacher.active) !== true) {
+      throw appError_('VALIDATION_ERROR', 'Only active teachers can be assigned to a class.');
+    }
 
     var rows = getTable_(SHEETS.CLASS_TEACHERS);
     var existing = rows.filter(function (row) {
@@ -358,9 +364,23 @@ function handleAdminAssignTeacher_(ctx) {
     })[0];
 
     if (ctx.body.remove === true) {
-      if (existing) updateRow_(SHEETS.CLASS_TEACHERS, { __row: existing.__row, row: { class_id: normalizeId_(classId), teacher_id: normalizeId_(teacherId), assigned_at: existing.assigned_at, __blank: true } });
-      var demoted = Object.assign({}, klass, { teacher_id: '' });
-      updateRow_(SHEETS.CLASSES, { __row: klass.__row, row: demoted });
+      if (existing) {
+        updateRow_(SHEETS.CLASS_TEACHERS, {
+          __row: existing.__row,
+          row: { class_id: '', teacher_id: '', assigned_at: '' },
+        });
+      }
+      if (normalizeId_(klass.teacher_id) === normalizeId_(teacherId)) {
+        var nextOwner = rows.filter(function (row) {
+          return normalizeId_(row.class_id) === normalizeId_(classId) &&
+            normalizeId_(row.teacher_id) !== normalizeId_(teacherId);
+        })[0];
+        var promoted = Object.assign({}, klass, {
+          teacher_id: nextOwner ? normalizeId_(nextOwner.teacher_id) : '',
+          updated_at: nowIso_(),
+        });
+        updateRow_(SHEETS.CLASSES, { __row: klass.__row, row: promoted });
+      }
       return { assigned: false };
     }
 
@@ -371,7 +391,7 @@ function handleAdminAssignTeacher_(ctx) {
     }
     // The first assigned teacher also becomes the primary owner, which is what
     // `listClassesFor_` and the dashboard "today's classes" list rely on.
-    if (!normalizeId_(klass.teacher_id)) {
+    if (ctx.body.primary === true || !normalizeId_(klass.teacher_id)) {
       var promoted = Object.assign({}, klass, { teacher_id: normalizeId_(teacherId), updated_at: nowIso_() });
       updateRow_(SHEETS.CLASSES, { __row: klass.__row, row: promoted });
     }

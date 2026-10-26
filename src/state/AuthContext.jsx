@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
   const [syncState, setSyncState] = useState({ pending: 0, lastResult: null });
   const mounted = useRef(true);
   const syncInFlight = useRef(null);
+  const authChannel = useRef(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -73,6 +74,32 @@ export function AuthProvider({ children }) {
     syncInFlight.current = { sessionToken, promise };
     return promise;
   }, [refreshPending]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return undefined;
+    const channel = new BroadcastChannel('attendance-auth');
+    authChannel.current = channel;
+    channel.onmessage = ({ data }) => {
+      if (data?.type === 'signed-in' && data.token && data.user) {
+        setSessionToken(data.token);
+        if (mounted.current) setUser(data.user);
+        setSetting(TOKEN_KEY, data.token).catch((error) => {
+          console.error('Could not persist the session from another tab.', error);
+        });
+        syncNow().catch((error) => console.error('Automatic sync failed.', error));
+      } else if (data?.type === 'signed-out') {
+        resetSession();
+        if (mounted.current) setUser(null);
+        setSetting(TOKEN_KEY, null).catch((error) => {
+          console.error('Could not clear the saved session after signing out.', error);
+        });
+      }
+    };
+    return () => {
+      authChannel.current = null;
+      channel.close();
+    };
+  }, [syncNow]);
 
   /** Restores a stored session and validates it against the backend. */
   const bootstrap = useCallback(async () => {
@@ -174,10 +201,15 @@ export function AuthProvider({ children }) {
       setSessionToken(data.session_token);
       await setSetting(TOKEN_KEY, data.session_token);
       setUser(data.user);
+      authChannel.current?.postMessage({
+        type: 'signed-in',
+        token: data.session_token,
+        user: data.user,
+      });
       // Attendance marked while signed out is still queued; drain it now,
       // then pull the roster so the UI matches the backend.
-      syncNow();
-      syncDown().catch(() => {});
+      syncNow().catch((error) => console.error('Automatic sync failed.', error));
+      syncDown().catch((error) => console.error('Could not refresh local data.', error));
       return data.user;
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : 'Sign-in failed. Please try again.');
@@ -197,6 +229,7 @@ export function AuthProvider({ children }) {
     resetSession();
     await setSetting(TOKEN_KEY, null);
     if (mounted.current) setUser(null);
+    authChannel.current?.postMessage({ type: 'signed-out' });
   }, []);
 
   /** Renders the Google button into `element`; returns a cleanup function. */

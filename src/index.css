@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,24 +8,37 @@
   html {
     -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
+    scroll-behavior: smooth;
   }
+
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-image: radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 22%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.18);
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200
       focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
       disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-sm hover:from-brand-600 hover:to-brand-700 active:from-brand-700 active:to-brand-800;
+    @apply btn bg-gradient-to-r from-brand-500 via-brand-600 to-brand-700 text-white shadow-sm shadow-brand-500/20 hover:-translate-y-0.5 hover:shadow-md hover:shadow-brand-500/25 active:translate-y-0 active:from-brand-600 active:to-brand-800;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100;
+    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100;
   }
   .btn-danger {
     @apply btn bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-sm hover:from-rose-600 hover:to-rose-700 active:from-rose-700 active:to-rose-800;
@@ -35,18 +50,18 @@
     @apply rounded-2xl px-6 py-4 text-lg;
   }
   .input {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900
-      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition
+      placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/15;
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-slate-700;
   }
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-card;
+    @apply rounded-[22px] border border-slate-200 bg-white/90 shadow-card backdrop-blur-sm;
   }
   .select-box {
     @apply flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700
-      transition hover:border-brand-400 hover:text-brand-600
+      shadow-sm transition hover:border-brand-400 hover:text-brand-600
       focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
       disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -77,4 +92,10 @@
   justify-content: center;
   min-height: 44px;
   min-width: 220px;
+}
+
+@media (max-width: 640px) {
+  .card {
+    @apply rounded-2xl;
+  }
 }

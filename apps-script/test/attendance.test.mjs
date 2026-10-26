@@ -397,6 +397,93 @@ test('a teacher is blocked from every admin action', () => {
     assert.equal(result.error.code, 'UNAUTHORIZED', action);
   });
 });
+
+test('an admin can reassign a class primary teacher and remove an assignment safely', () => {
+  const backend = createBackend({ data: seed() });
+  const token = teacherSession(backend, 'admin@example.edu');
+
+  const assigned = callAction(
+    backend,
+    'adminAssignTeacher',
+    { class_id: CLASS_ID, teacher_id: OTHER_TEACHER_ID, primary: true },
+    token
+  );
+  assert.equal(assigned.success, true);
+  assert.equal(
+    backend.spreadsheet.table('Classes').rows[0][6],
+    OTHER_TEACHER_ID,
+    'explicit primary assignment changes the class owner'
+  );
+
+  const removed = callAction(
+    backend,
+    'adminAssignTeacher',
+    { class_id: CLASS_ID, teacher_id: OTHER_TEACHER_ID, remove: true },
+    token
+  );
+  assert.equal(removed.success, true, JSON.stringify(removed));
+  assert.equal(
+    backend.spreadsheet.table('Classes').rows[0][6],
+    '',
+    'removing the only assigned teacher leaves the class unassigned'
+  );
+  assert.equal(
+    backend.spreadsheet.table('ClassTeachers').rows.length,
+    0,
+    'removing the only assigned teacher clears the assignment row'
+  );
+});
+
+test('removing a secondary teacher does not clear the primary class owner', () => {
+  const backend = createBackend({ data: seed() });
+  const token = teacherSession(backend, 'admin@example.edu');
+  callAction(
+    backend,
+    'adminAssignTeacher',
+    { class_id: CLASS_ID, teacher_id: OTHER_TEACHER_ID },
+    token
+  );
+
+  const removed = callAction(
+    backend,
+    'adminAssignTeacher',
+    { class_id: CLASS_ID, teacher_id: OTHER_TEACHER_ID, remove: true },
+    token
+  );
+
+  assert.equal(removed.success, true);
+  assert.equal(backend.spreadsheet.table('Classes').rows[0][6], TEACHER_ID);
+});
+
+test('an admin cannot assign a suspended teacher to a class', () => {
+  const backend = createBackend({ data: seed() });
+  const token = teacherSession(backend, 'admin@example.edu');
+  const result = callAction(
+    backend,
+    'adminAssignTeacher',
+    { class_id: CLASS_ID, teacher_id: 'TCH-0003', primary: true },
+    token
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'VALIDATION_ERROR');
+  assert.match(result.error.message, /Only active teachers/);
+  assert.equal(backend.spreadsheet.table('Classes').rows[0][6], TEACHER_ID);
+});
+
+test('an admin cannot create a class assigned to a suspended teacher', () => {
+  const backend = createBackend({ data: seed() });
+  const result = callAction(
+    backend,
+    'createClass',
+    { class_name: 'Inactive Owner', teacher_id: 'TCH-0003' },
+    teacherSession(backend, 'admin@example.edu')
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'VALIDATION_ERROR');
+  assert.match(result.error.message, /Only active teachers/);
+});
 // ------------------------------------------------------------ teacher-owned
 
 test('a teacher creates their own class and owns it immediately', () => {
@@ -440,6 +527,9 @@ test('a teacher updates only their own class', () => {
   assert.equal(updated.success, true);
   assert.equal(updated.data.class.class_name, 'Mine Renamed');
   assert.equal(updated.data.class.attendance_threshold, 80);
+  const storedClass = backend.spreadsheet.table('Classes').rows.find((row) => row[0] === mine.data.class.class_id);
+  assert.equal(storedClass[1], 'Mine Renamed');
+  assert.equal(storedClass[7], 80);
 
   const blocked = callAction(
     backend,
