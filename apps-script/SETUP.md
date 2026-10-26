@@ -28,8 +28,8 @@ the spreadsheet kept private.
    - `lib/Auth.gs`
    - `lib/Handlers.gs`
    - `Code.gs`
-6. Run the `ping_` function once from the editor. This creates the seven tabs
-   (`Teachers`, `Classes`, `ClassTeachers`, `Students`, `Sessions`,
+6. Run the `runPeopleSheetMigration` function once from the editor. This creates the eight tabs
+   (`Teachers`, `Admins`, `Classes`, `ClassTeachers`, `Students`, `Sessions`,
    `Attendance`, `SyncLog`) with the correct headers.
 7. Authorise the Sheets scope when prompted.
 
@@ -41,7 +41,7 @@ Project Settings → Script Properties:
 | --- | --- |
 | `SPREADSHEET_ID` | id from step 1 |
 | `GOOGLE_CLIENT_ID` | OAuth client id the frontend will use (step 5) |
-| `ORG_EMAIL_DOMAIN` | optional, e.g. `university.edu` — extra restriction on top of the Teachers sheet |
+| `ORG_EMAIL_DOMAIN` | optional, e.g. `university.edu` — extra restriction on top of both people sheets |
 | `SESSION_TTL_HOURS` | optional, default `24` |
 | `SESSION_SECRET` | leave empty; generated automatically on first login. Rotating it signs everyone out. |
 
@@ -52,7 +52,7 @@ Project Settings → Script Properties:
 3. Execute as: **Me** (the owner).
 4. Who has access: **Anyone** in your Google Workspace domain, or **Anyone
    with a Google account** if you are not on Workspace. The app itself still
-   checks the Teachers sheet on every login, so a public endpoint is safe.
+   checks the role-specific people sheet on every login, so a public endpoint is safe.
 5. Authorise, then copy the deployment URL — this is `VITE_API_URL`.
 
 > Deployments are immutable. After every code change: Deploy → Manage
@@ -73,19 +73,44 @@ Project Settings → Script Properties:
 The backend verifies the ID token's `aud` against `GOOGLE_CLIENT_ID`, so both
 must match exactly.
 
-## 6. Seed the Teachers sheet
+## 6. Add teachers and admins
 
-Open the `Teachers` tab and add rows (header already present):
+The tabs have separate schemas and ID sequences. Add teachers only to
+`Teachers` and administrators only to `Admins`:
 
-| teacher_id | name | email | role | active | created_at |
-| --- | --- | --- | --- | --- | --- |
-| tch_alice | Alice Rao | alice@example.edu | teacher | TRUE | 2026-01-15T09:00:00.000Z |
-| tch_admin | Admin User | admin@example.edu | admin | TRUE | 2026-01-15T09:00:00.000Z |
+| Teachers: `teacher_id` | name | email | active | created_at |
+| --- | --- | --- | --- | --- |
+| `TCH-0001` | Alice Rao | alice@example.edu | TRUE | 2026-01-15T09:00:00.000Z |
 
-`teacher_id` can be any unique text. Email matching is case-insensitive. Only
-`teacher` and `admin` are accepted as roles.
+| Admins: `admin_id` | name | email | active | created_at |
+| --- | --- | --- | --- | --- |
+| `ADM-0001` | Admin User | admin@example.edu | TRUE | 2026-01-15T09:00:00.000Z |
 
-## 7. Smoke test
+When adding accounts through the admin interface, the backend assigns these
+IDs automatically. If adding a row manually, use the next unused ID in that
+sheet's sequence and keep email addresses unique across both tabs. Email
+matching is case-insensitive.
+
+## 7. Migrate an existing mixed-role sheet
+
+For an existing backend whose `Teachers` tab has a `role` column:
+
+1. Make a backup copy of the entire spreadsheet.
+2. Update the Apps Script project with this repository's backend files.
+3. Deploy a **new Web App version** before migrating the sheet.
+4. Run `runPeopleSheetMigration` once from the editor. It separates admins, assigns `TCH-####`
+   and `ADM-####` IDs, and updates matching teacher references in `Classes`,
+   `ClassTeachers`, and `Sessions`.
+5. Verify the two people tabs and the updated class assignments before
+   continuing to use the application.
+
+The migration assigns new IDs, so all users must sign in again afterward.
+
+Migration is safe to retry if interrupted. If it finds a legacy admin assigned
+to a class or session as its teacher, it stops without completing the migration;
+reassign those records to a teacher and run `runPeopleSheetMigration` again.
+
+## 8. Smoke test
 
 ```bash
 curl -s -X POST "$VITE_API_URL" -H 'Content-Type: application/json' \
@@ -102,7 +127,7 @@ A `SERVER_ERROR` mentioning a script property means step 3 is incomplete.
 | `SERVER_ERROR` ... missing script property | step 3 |
 | `SERVER_ERROR` ... Sheet is missing | step 2.6 not run, or a tab renamed |
 | `UNAUTHENTICATED` on login | wrong `GOOGLE_CLIENT_ID`, or the token audience differs |
-| `UNAUTHORIZED` on login | email missing from Teachers, or `active` is `FALSE`, or domain mismatch |
+| `UNAUTHORIZED` on login | email missing from `Teachers` and `Admins`, or `active` is `FALSE`, or domain mismatch |
 | `UNAUTHORIZED` on a class | the teacher is not the class owner |
 | `DUPLICATE` on submit | attendance already submitted for that class + date |
 | Everything works in editor but not in the Web App | stale deployment — redeploy as a new version |

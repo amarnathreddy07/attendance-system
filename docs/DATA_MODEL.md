@@ -5,7 +5,8 @@ the only writer; the frontend talks exclusively to the Web App.
 
 ## Conventions
 
-- Primary keys are opaque, prefixed ids (`tch_`, `cls_`, `stu_`, `ses_`, `att_`).
+- Person IDs are sequential and role-specific (`TCH-####`, `ADM-####`); other
+  primary keys use their existing prefixes (`cls_`, `stu_`, `ses_`, `att_`).
 - Timestamps are ISO-8601 UTC (`2026-01-15T09:00:00.000Z`).
 - Booleans are stored as `TRUE` / `FALSE` text (what Sheets renders).
 - Attendance status is normalized server-side to `P`, `A`, `OD`.
@@ -15,14 +16,27 @@ the only writer; the frontend talks exclusively to the Web App.
 
 ### Teachers
 
-The single source of truth for who may sign in and what they may do.
+The source of truth for teacher accounts. Teacher accounts can own or be
+assigned to classes.
 
 | column | notes |
 | --- | --- |
-| teacher_id | primary key |
+| teacher_id | primary key; assigned as `TCH-0001`, `TCH-0002`, … |
 | name | display name |
-| email | case-insensitive lookup key |
-| role | `teacher` or `admin` |
+| email | case-insensitive lookup key; unique across both people tabs |
+| active | deactivating here revokes access on the next request |
+| created_at | |
+
+### Admins
+
+The source of truth for administrator accounts. Admin accounts are separate
+from teacher accounts and cannot own or be assigned to classes.
+
+| column | notes |
+| --- | --- |
+| admin_id | primary key; assigned as `ADM-0001`, `ADM-0002`, … |
+| name | display name |
+| email | case-insensitive lookup key; unique across both people tabs |
 | active | deactivating here revokes access on the next request |
 | created_at | |
 

@@ -5,12 +5,15 @@
  * it touches class data, so authorization cannot be forgotten at the call site.
  */
 
-function dtoTeacher_(teacher) {
+function dtoTeacher_(teacher, role) {
+  var isAdmin = role === ROLES.ADMIN;
+  var id = normalizeId_(isAdmin ? teacher.admin_id : teacher.teacher_id);
   return {
-    teacher_id: normalizeId_(teacher.teacher_id),
+    teacher_id: id,
+    admin_id: isAdmin ? id : undefined,
     name: String(teacher.name || '').trim(),
     email: normalizeEmail_(teacher.email),
-    role: String(teacher.role || '').trim().toLowerCase(),
+    role: role || ROLES.TEACHER,
     active: normalizeBoolean_(teacher.active) === true,
   };
 }

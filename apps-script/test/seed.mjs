@@ -1,7 +1,8 @@
 /** Shared seed data: headers must match SCHEMA exactly. */
 
 export const HEADERS = {
-  Teachers: ['teacher_id', 'name', 'email', 'role', 'active', 'created_at'],
+  Teachers: ['teacher_id', 'name', 'email', 'active', 'created_at'],
+  Admins: ['admin_id', 'name', 'email', 'active', 'created_at'],
   Classes: [
     'class_id',
     'class_name',
@@ -44,9 +45,9 @@ export const HEADERS = {
   SyncLog: ['client_operation_id', 'action', 'processed_at', 'result'],
 };
 
-export const TEACHER_ID = 'tch_alice';
-export const OTHER_TEACHER_ID = 'tch_bob';
-export const ADMIN_ID = 'tch_admin';
+export const TEACHER_ID = 'TCH-0001';
+export const OTHER_TEACHER_ID = 'TCH-0002';
+export const ADMIN_ID = 'ADM-0001';
 export const CLASS_ID = 'cls_101';
 export const OTHER_CLASS_ID = 'cls_202';
 
@@ -54,10 +55,13 @@ export function seed() {
   return {
     Teachers: [
       HEADERS.Teachers,
-      [TEACHER_ID, 'Alice Teacher', 'alice@example.edu', 'teacher', 'TRUE', '2026-01-01T00:00:00.000Z'],
-      [OTHER_TEACHER_ID, 'Bob Teacher', 'bob@example.edu', 'teacher', 'TRUE', '2026-01-01T00:00:00.000Z'],
-      [ADMIN_ID, 'Admin User', 'admin@example.edu', 'admin', 'TRUE', '2026-01-01T00:00:00.000Z'],
-      ['tch_inactive', 'Retired Teacher', 'gone@example.edu', 'teacher', 'FALSE', '2026-01-01T00:00:00.000Z'],
+      [TEACHER_ID, 'Alice Teacher', 'alice@example.edu', 'TRUE', '2026-01-01T00:00:00.000Z'],
+      [OTHER_TEACHER_ID, 'Bob Teacher', 'bob@example.edu', 'TRUE', '2026-01-01T00:00:00.000Z'],
+      ['TCH-0003', 'Retired Teacher', 'gone@example.edu', 'FALSE', '2026-01-01T00:00:00.000Z'],
+    ],
+    Admins: [
+      HEADERS.Admins,
+      [ADMIN_ID, 'Admin User', 'admin@example.edu', 'TRUE', '2026-01-01T00:00:00.000Z'],
     ],
     Classes: [
       HEADERS.Classes,

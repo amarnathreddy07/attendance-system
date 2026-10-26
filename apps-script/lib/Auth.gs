@@ -5,9 +5,8 @@
  *  1. The browser signs in with Google Identity Services and gets an ID token.
  *  2. login() verifies that token with Google (audience + expiry + verified
  *     email) — the signature is never checked locally.
- *  3. The email is looked up in the Teachers sheet. That sheet is the only
- *     source of truth for who exists and what role they hold. No domain
- *     whitelist is trusted on its own.
+ *  3. The email is looked up in the Teachers or Admins sheet. Those sheets
+ *     are the source of truth for who exists and what role they hold.
  *  4. The backend issues its own signed session token. The frontend never
  *     carries or trusts a role claim: it displays what this code returns.
  *
@@ -31,15 +30,15 @@ function handleLogin_(ctx) {
     throw appError_('UNAUTHORIZED', 'You are not authorized to access this system.');
   }
 
-  var teacher = findTeacherByEmail_(profile.email);
-  if (!teacher) {
+  var principal = findPrincipalByEmail_(profile.email);
+  if (!principal) {
     throw appError_('UNAUTHORIZED', 'You are not authorized to access this system.');
   }
-  if (normalizeBoolean_(teacher.active) !== true) {
+  if (normalizeBoolean_(principal.active) !== true) {
     throw appError_('UNAUTHORIZED', 'You are not authorized to access this system.');
   }
 
-  var user = publicUser_(teacher);
+  var user = publicUser_(principal);
   var session = issueSession_(user);
   return { user: user, session_token: session.token, expires_at: session.expires_at };
 }
@@ -112,19 +111,15 @@ function signToken_(payload) {
   return body + '.' + signature;
 }
 
-/** Returns the caller as stored in the Teachers sheet, or null. */
+/** Returns the caller as stored in the role-specific sheet, or null. */
 function resolveUser_(ctx) {
   if (!ctx || !ctx.token) return null;
   var payload = verifySessionToken_(ctx.token);
   if (!payload) return null;
-  var teacher = findById_(SHEETS.TEACHERS, payload.tid);
-  if (!teacher) return null;
-  // Re-read role/active on every request: a deactivation takes effect at once.
-  var user = publicUser_(teacher);
-  if (user.role !== payload.rl) {
-    return { teacher_id: user.teacher_id, name: user.name, email: user.email, role: payload.rl, active: user.active };
-  }
-  return user;
+  var principal = findPrincipalById_(payload.tid, payload.rl);
+  if (!principal) return null;
+  // Re-read active status on every request so deactivation takes effect at once.
+  return publicUser_(principal);
 }
 
 function verifySessionToken_(token) {

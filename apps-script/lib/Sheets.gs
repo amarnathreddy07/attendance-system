@@ -12,6 +12,7 @@
 
 var SHEETS = {
   TEACHERS: 'Teachers',
+  ADMINS: 'Admins',
   CLASSES: 'Classes',
   CLASS_TEACHERS: 'ClassTeachers',
   STUDENTS: 'Students',
@@ -21,7 +22,8 @@ var SHEETS = {
 };
 
 var SCHEMA = {};
-SCHEMA[SHEETS.TEACHERS] = ['teacher_id', 'name', 'email', 'role', 'active', 'created_at'];
+SCHEMA[SHEETS.TEACHERS] = ['teacher_id', 'name', 'email', 'active', 'created_at'];
+SCHEMA[SHEETS.ADMINS] = ['admin_id', 'name', 'email', 'active', 'created_at'];
 SCHEMA[SHEETS.CLASSES] = [
   'class_id',
   'class_name',
@@ -246,15 +248,59 @@ function findByField_(name, field, value) {
   return null;
 }
 
-/** Case-insensitive email lookup — the Teachers sheet is the source of truth. */
-function findTeacherByEmail_(email) {
+/** Returns a canonical principal record regardless of its backing tab. */
+function findPrincipalByEmail_(email) {
   var target = normalizeEmail_(email);
   if (!target) return null;
-  var rows = getTable_(SHEETS.TEACHERS);
-  for (var i = 0; i < rows.length; i += 1) {
-    if (normalizeEmail_(rows[i].email) === target) return rows[i];
+  var teachers = getTable_(SHEETS.TEACHERS);
+  for (var i = 0; i < teachers.length; i += 1) {
+    if (normalizeEmail_(teachers[i].email) === target) {
+      return Object.assign({}, teachers[i], { role: ROLES.TEACHER });
+    }
+  }
+  var admins = getTable_(SHEETS.ADMINS);
+  for (var j = 0; j < admins.length; j += 1) {
+    if (normalizeEmail_(admins[j].email) === target) {
+      return Object.assign({}, admins[j], {
+        teacher_id: normalizeId_(admins[j].admin_id),
+        role: ROLES.ADMIN,
+      });
+    }
   }
   return null;
+}
+
+function findPrincipalById_(id, role) {
+  if (role === ROLES.ADMIN) {
+    var admin = findById_(SHEETS.ADMINS, id);
+    return admin
+      ? Object.assign({}, admin, { teacher_id: normalizeId_(admin.admin_id), role: ROLES.ADMIN })
+      : null;
+  }
+  if (role === ROLES.TEACHER) {
+    var teacher = findById_(SHEETS.TEACHERS, id);
+    return teacher ? Object.assign({}, teacher, { role: ROLES.TEACHER }) : null;
+  }
+  return null;
+}
+
+function allocatePersonId_(role) {
+  var isAdmin = role === ROLES.ADMIN;
+  var propertyKey = isAdmin ? 'NEXT_ADMIN_ID' : 'NEXT_TEACHER_ID';
+  var prefix = isAdmin ? 'ADM-' : 'TCH-';
+  var tab = isAdmin ? SHEETS.ADMINS : SHEETS.TEACHERS;
+  var idKey = isAdmin ? 'admin_id' : 'teacher_id';
+  var rows = getTable_(tab);
+  var next = Number(scriptProps_().getProperty(propertyKey)) || 1;
+  var pattern = new RegExp('^' + prefix + '(\\d+)$');
+  rows.forEach(function (row) {
+    var match = String(row[idKey] || '').match(pattern);
+    if (match) next = Math.max(next, Number(match[1]) + 1);
+  });
+
+  var id = prefix + String(next).padStart(4, '0');
+  scriptProps_().setProperty(propertyKey, String(next + 1));
+  return id;
 }
 
 function appendAndRead_(name, rows) {
@@ -263,8 +309,144 @@ function appendAndRead_(name, rows) {
   });
 }
 
+function writeSheetMatrix_(sheet, matrix) {
+  sheet.clearContents();
+  if (matrix.length) {
+    sheet.getRange(1, 1, matrix.length, matrix[0].length).setValues(matrix);
+  }
+}
+
+function migrateLegacyPeople_() {
+  var ss = getSpreadsheet_();
+  var teachersSheet = ss.getSheetByName(SHEETS.TEACHERS);
+  if (!teachersSheet || teachersSheet.getLastRow() < 1) return false;
+
+  var legacyValues = teachersSheet.getDataRange().getValues();
+  var headers = (legacyValues[0] || []).map(headerToKey_);
+  if (headers.indexOf('role') < 0) return false;
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
+    throw appError_('SERVER_ERROR', 'The sheet is busy. Please retry in a moment.');
+  }
+
+  try {
+    var adminsSheet = ss.getSheetByName(SHEETS.ADMINS) || ss.insertSheet(SHEETS.ADMINS);
+    var adminHeaders = SCHEMA[SHEETS.ADMINS];
+    var adminValues = adminsSheet.getDataRange().getValues();
+    if (adminsSheet.getLastRow() < 1) {
+      adminValues = [adminHeaders];
+      adminsSheet.getRange(1, 1, 1, adminHeaders.length).setValues([adminHeaders]);
+    } else if (
+      !adminHeaders.every(function (header, index) {
+        return headerToKey_(adminValues[0][index]) === header;
+      })
+    ) {
+      throw appError_(
+        'SERVER_ERROR',
+        'The Admins sheet has an unexpected header. Back it up and align its columns before migrating.'
+      );
+    }
+
+    var targetAdminByEmail = {};
+    for (var a = 1; a < adminValues.length; a += 1) {
+      var existingEmail = normalizeEmail_(adminValues[a][2]);
+      if (existingEmail) targetAdminByEmail[existingEmail] = normalizeId_(adminValues[a][0]);
+    }
+
+    var properties = scriptProps_();
+    var storedMap = properties.getProperty('PEOPLE_ID_MIGRATION_MAP');
+    var idMap = storedMap ? JSON.parse(storedMap) : {};
+    var teacherIdMap = {};
+    var legacyAdminIds = {};
+    var seenLegacyEmails = {};
+    var migratedTeachers = [];
+    var migratedAdmins = adminValues.slice(1);
+
+    for (var r = 1; r < legacyValues.length; r += 1) {
+      var raw = legacyValues[r];
+      if (!raw || raw.join('') === '') continue;
+      var person = {};
+      headers.forEach(function (key, index) {
+        person[key] = raw[index] === undefined ? '' : raw[index];
+      });
+      var oldId = normalizeId_(person.teacher_id);
+      var role = String(person.role || '').trim().toLowerCase();
+      if (!oldId || (role !== ROLES.TEACHER && role !== ROLES.ADMIN)) {
+        throw appError_('SERVER_ERROR', 'The legacy Teachers sheet contains a row with a missing ID or invalid role.');
+      }
+
+      var email = normalizeEmail_(person.email);
+      if (email && seenLegacyEmails[email]) {
+        throw appError_('SERVER_ERROR', 'The legacy Teachers sheet has duplicate email addresses. Resolve duplicates before migrating.');
+      }
+      if (email) seenLegacyEmails[email] = true;
+      if (role === ROLES.TEACHER && email && targetAdminByEmail[email]) {
+        throw appError_('SERVER_ERROR', 'An email address exists in both people tabs. Resolve the duplicate before migrating.');
+      }
+      var newId = idMap[oldId];
+      if (!newId) {
+        newId = role === ROLES.ADMIN ? targetAdminByEmail[email] : '';
+        if (!newId) newId = allocatePersonId_(role);
+        idMap[oldId] = newId;
+      }
+      if (role === ROLES.ADMIN) legacyAdminIds[oldId] = true;
+      else teacherIdMap[oldId] = newId;
+
+      var active = normalizeBoolean_(person.active);
+      var migratedRow =
+        role === ROLES.ADMIN
+          ? [newId, person.name || '', email, active ? 'TRUE' : 'FALSE', person.created_at || '']
+          : [newId, person.name || '', email, active ? 'TRUE' : 'FALSE', person.created_at || ''];
+
+      if (role === ROLES.ADMIN) {
+        if (!email || !targetAdminByEmail[email]) {
+          migratedAdmins.push(migratedRow);
+          if (email) targetAdminByEmail[email] = newId;
+        }
+      } else {
+        migratedTeachers.push(migratedRow);
+      }
+    }
+
+    properties.setProperty('PEOPLE_ID_MIGRATION_MAP', JSON.stringify(idMap));
+    [SHEETS.CLASSES, SHEETS.CLASS_TEACHERS, SHEETS.SESSIONS].forEach(function (name) {
+      var sheet = ss.getSheetByName(name);
+      if (!sheet) return;
+      var values = sheet.getDataRange().getValues();
+      var keys = (values[0] || []).map(headerToKey_);
+      var column = keys.indexOf('teacher_id');
+      if (column < 0) return;
+      for (var row = 1; row < values.length; row += 1) {
+        var existingId = normalizeId_(values[row][column]);
+        if (legacyAdminIds[existingId]) {
+          throw appError_(
+            'SERVER_ERROR',
+            'A legacy admin is assigned to a class or session. Reassign those records to a teacher before running the people-sheet migration.'
+          );
+        }
+        if (teacherIdMap[existingId]) values[row][column] = teacherIdMap[existingId];
+      }
+      if (values.length > 1) {
+        sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      }
+    });
+
+    writeSheetMatrix_(adminsSheet, [adminHeaders].concat(migratedAdmins));
+    writeSheetMatrix_(teachersSheet, [SCHEMA[SHEETS.TEACHERS]].concat(migratedTeachers));
+    adminsSheet.setFrozenRows(1);
+    teachersSheet.setFrozenRows(1);
+    properties.deleteProperty('PEOPLE_ID_MIGRATION_MAP');
+    invalidateTables_(null);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** Creates the spreadsheet tabs with headers if they do not exist yet. */
 function ensureSchema_() {
+  migrateLegacyPeople_();
   var ss = getSpreadsheet_();
   Object.keys(SCHEMA).forEach(function (name) {
     var sheet = ss.getSheetByName(name);
@@ -290,4 +472,8 @@ function ensureSchema_() {
 function ping_() {
   var names = ensureSchema_();
   return { ok: true, spreadsheetId: requireConfig_('spreadsheetId'), sheets: names };
+}
+
+function runPeopleSheetMigration() {
+  return ping_();
 }

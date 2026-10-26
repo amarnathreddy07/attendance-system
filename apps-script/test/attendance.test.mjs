@@ -396,7 +396,7 @@ test('a teacher creates their own class and owns it immediately', () => {
   );
 
   assert.equal(created.success, true);
-  assert.equal(created.data.class.teacher_id, 'tch_alice');
+  assert.equal(created.data.class.teacher_id, TEACHER_ID);
   assert.equal(created.data.class.attendance_threshold, 70);
 
   const classes = callAction(backend, 'getClasses', {}, token);
@@ -404,7 +404,7 @@ test('a teacher creates their own class and owns it immediately', () => {
 
   const rows = backend.spreadsheet.table('Classes').rows;
   assert.equal(rows.length, 3);
-  assert.equal(rows[2][6], 'tch_alice');
+  assert.equal(rows[2][6], TEACHER_ID);
 });
 
 test('a teacher updates only their own class', () => {

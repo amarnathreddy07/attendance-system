@@ -86,6 +86,7 @@ class FakeRange {
       values: clone(values),
     });
   }
+
 }
 
 class FakeSheet {
@@ -115,6 +116,11 @@ class FakeSheet {
 
   setFrozenRows(count) {
     this.frozenRows = count;
+  }
+
+  clearContents() {
+    this.matrix = [];
+    return this;
   }
 }
 
@@ -198,6 +204,9 @@ export function createBackend(options = {}) {
         getProperty: (key) => (key in props ? props[key] : null),
         setProperty: (key, value) => {
           props[key] = value;
+        },
+        deleteProperty: (key) => {
+          delete props[key];
         },
       }),
     },

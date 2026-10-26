@@ -22,7 +22,7 @@ test('login is case-insensitive on email', () => {
   assert.equal(data.user.email, 'alice@example.edu');
 });
 
-test('login rejects an email that is not in the Teachers sheet', () => {
+test('login rejects an email that is not in either people sheet', () => {
   const backend = createBackend({ data: seed() });
   const result = callAction(backend, 'login', { id_token: 'x' }, null);
   setGoogleIdentity(backend, {
@@ -134,7 +134,7 @@ test('deactivating a teacher revokes access on the next request without re-login
 
   const dataTable = backend.spreadsheet.table('Teachers');
   const activeIndex = dataTable.header.indexOf('active');
-  const aliceIndex = dataTable.rows.findIndex((row) => row[0] === 'tch_alice');
+  const aliceIndex = dataTable.rows.findIndex((row) => row[0] === 'TCH-0001');
   dataTable.rows[aliceIndex][activeIndex] = 'FALSE';
   backend.spreadsheet.sheets.Teachers.matrix = [dataTable.header, ...dataTable.rows];
   backend.cache.clear();
@@ -144,22 +144,14 @@ test('deactivating a teacher revokes access on the next request without re-login
   assert.equal(attempt.error.code, 'UNAUTHORIZED');
 });
 
-test('a role change in the sheet overrides the claim inside an existing token', () => {
+test('a session resolves its role and ID from the role-specific sheet', () => {
   const backend = createBackend({ data: seed() });
-  const data = loginAs(backend, 'alice@example.edu');
-
-  const dataTable = backend.spreadsheet.table('Teachers');
-  const roleIndex = dataTable.header.indexOf('role');
-  const aliceIndex = dataTable.rows.findIndex((row) => row[0] === 'tch_alice');
-  dataTable.rows[aliceIndex][roleIndex] = 'admin';
-  backend.spreadsheet.sheets.Teachers.matrix = [dataTable.header, ...dataTable.rows];
-  backend.cache.clear();
-
-  const attempt = callAction(backend, 'getCurrentUser', {}, data.session_token);
-  // resolveUser_ keeps the token's role, so a stale token cannot escalate...
-  assert.equal(attempt.data.user.role, 'teacher');
-  // ...and a fresh login picks up the sheet value.
-  assert.equal(loginAs(backend, 'alice@example.edu').user.role, 'admin');
+  const teacher = loginAs(backend, 'alice@example.edu');
+  const admin = loginAs(backend, 'admin@example.edu');
+  assert.equal(teacher.user.role, 'teacher');
+  assert.equal(teacher.user.teacher_id, 'TCH-0001');
+  assert.equal(admin.user.role, 'admin');
+  assert.equal(admin.user.teacher_id, ADMIN_ID);
 });
 
 test('the session token never carries a role the sheet does not grant', () => {
@@ -169,8 +161,8 @@ test('the session token never carries a role the sheet does not grant', () => {
 
   assert.equal(payload.em, 'alice@example.edu');
   assert.equal(payload.rl, 'teacher');
-  assert.equal(payload.tid, 'tch_alice');
-  assert.ok(!('role' in payload), 'role is only readable through the Teachers sheet lookup');
+  assert.equal(payload.tid, 'TCH-0001');
+  assert.ok(!('role' in payload), 'role is only readable through the role-specific sheet lookup');
 });
 
 test('unknown actions are rejected before any handler runs', () => {
@@ -205,6 +197,60 @@ test('admin listing is reachable for an admin session', () => {
   const attempt = callAction(backend, 'adminGetTeachers', {}, data.session_token);
 
   assert.equal(attempt.success, true);
-  assert.equal(attempt.data.teachers.length, 4);
-  assert.equal(attempt.data.teachers.find((t) => t.teacher_id === ADMIN_ID).role, 'admin');
+  assert.equal(attempt.data.teachers.length, 3);
+  assert.equal(attempt.data.admins.length, 1);
+  assert.equal(attempt.data.admins[0].teacher_id, ADMIN_ID);
+});
+
+test('admin creation uses independent teacher and admin ID sequences', () => {
+  const backend = createBackend({ data: seed() });
+  const admin = loginAs(backend, 'admin@example.edu');
+
+  const teacher = callAction(
+    backend,
+    'adminCreateTeacher',
+    { name: 'New Teacher', email: 'new.teacher@example.edu', role: 'teacher' },
+    admin.session_token
+  );
+  const newAdmin = callAction(
+    backend,
+    'adminCreateTeacher',
+    { name: 'New Admin', email: 'new.admin@example.edu', role: 'admin' },
+    admin.session_token
+  );
+
+  assert.equal(teacher.data.teacher.teacher_id, 'TCH-0004');
+  assert.equal(newAdmin.data.teacher.teacher_id, 'ADM-0002');
+  assert.equal(backend.spreadsheet.table('Teachers').rows.length, 4);
+  assert.equal(backend.spreadsheet.table('Admins').rows.length, 2);
+});
+
+test('legacy mixed people sheet migrates IDs and teacher references once', () => {
+  const legacy = seed();
+  legacy.Teachers = [
+    ['teacher_id', 'name', 'email', 'role', 'active', 'created_at'],
+    ['tch_alice', 'Alice Teacher', 'alice@example.edu', 'teacher', 'TRUE', '2026-01-01T00:00:00.000Z'],
+    ['tch_admin', 'Admin User', 'admin@example.edu', 'admin', 'TRUE', '2026-01-01T00:00:00.000Z'],
+  ];
+  delete legacy.Admins;
+  legacy.Classes[1][6] = 'tch_alice';
+
+  const backend = createBackend({ data: legacy });
+  backend.helpers.ensureSchema();
+
+  assert.deepEqual(backend.spreadsheet.table('Teachers').rows[0].slice(0, 3), [
+    'TCH-0001',
+    'Alice Teacher',
+    'alice@example.edu',
+  ]);
+  assert.deepEqual(backend.spreadsheet.table('Admins').rows[0].slice(0, 3), [
+    'ADM-0001',
+    'Admin User',
+    'admin@example.edu',
+  ]);
+  assert.equal(backend.spreadsheet.table('Classes').rows[0][6], 'TCH-0001');
+  assert.equal(backend.props.PEOPLE_ID_MIGRATION_MAP, undefined);
+  backend.helpers.ensureSchema();
+  assert.equal(backend.spreadsheet.table('Teachers').rows.length, 1);
+  assert.equal(backend.spreadsheet.table('Admins').rows.length, 1);
 });

@@ -3,7 +3,7 @@
  *
  * Shared shape: resolve the caller, authorize, validate, do batched work.
  * No handler accepts a role, a teacher_id or a class_id as authority — those
- * are read from the session and from the Teachers sheet.
+ * are read from the session and from the role-specific people sheets.
  */
 
 // ---------------------------------------------------------------- teacher
@@ -114,13 +114,21 @@ function handleAdminGetTeachers_(ctx) {
       classCount += assignments.filter(function (row) {
         return normalizeId_(row.teacher_id) === teacherId;
       }).length;
-      return Object.assign(dtoTeacher_(teacher), { class_count: classCount });
+      return Object.assign(dtoTeacher_(teacher, ROLES.TEACHER), { class_count: classCount });
     })
     .sort(function (a, b) {
       return a.name.localeCompare(b.name);
     });
 
-  return { teachers: teachers };
+  var admins = getTable_(SHEETS.ADMINS)
+    .map(function (admin) {
+      return dtoTeacher_(admin, ROLES.ADMIN);
+    })
+    .sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
+
+  return { teachers: teachers, admins: admins };
 }
 
 function handleAdminCreateTeacher_(ctx) {
@@ -128,46 +136,56 @@ function handleAdminCreateTeacher_(ctx) {
   var input = validateTeacherPayload_(ctx.body);
 
   return withSheetLock_(function () {
-    if (findTeacherByEmail_(input.email)) {
-      throw appError_('DUPLICATE', 'A teacher with that email address already exists.');
+    if (findPrincipalByEmail_(input.email)) {
+      throw appError_('DUPLICATE', 'A person with that email address already exists.');
     }
-    var row = {
-      teacher_id: newId_('tch'),
-      name: input.name,
-      email: input.email,
-      role: input.role,
-      active: input.active,
-      created_at: nowIso_(),
-    };
-    appendRows_(SHEETS.TEACHERS, [row]);
-    return { teacher: dtoTeacher_(row) };
+    var isAdmin = input.role === ROLES.ADMIN;
+    var row = isAdmin
+      ? {
+          admin_id: allocatePersonId_(input.role),
+          name: input.name,
+          email: input.email,
+          active: input.active,
+          created_at: nowIso_(),
+        }
+      : {
+          teacher_id: allocatePersonId_(input.role),
+          name: input.name,
+          email: input.email,
+          active: input.active,
+          created_at: nowIso_(),
+        };
+    appendRows_(isAdmin ? SHEETS.ADMINS : SHEETS.TEACHERS, [row]);
+    return { teacher: dtoTeacher_(row, input.role) };
   });
 }
 
 function handleAdminUpdateTeacher_(ctx) {
   requireAdmin_(requireUser_(ctx));
   var teacherId = requireString_(ctx.body.teacher_id, 'teacher_id');
+  var role = requireRole_(ctx.body.role || ROLES.TEACHER);
   var payload = ctx.body;
 
   return withSheetLock_(function () {
-    var existing = findById_(SHEETS.TEACHERS, teacherId);
+    var isAdmin = role === ROLES.ADMIN;
+    var sheetName = isAdmin ? SHEETS.ADMINS : SHEETS.TEACHERS;
+    var existing = findById_(sheetName, teacherId);
     if (!existing) {
-      throw appError_('NOT_FOUND', 'That teacher does not exist.');
+      throw appError_('NOT_FOUND', 'That person does not exist.');
     }
     var next = Object.assign({}, existing);
     if (payload.name !== undefined) next.name = requireString_(payload.name, 'name');
     if (payload.email !== undefined) {
       next.email = requireEmail_(payload.email);
-      var clash = findTeacherByEmail_(next.email);
+      var clash = findPrincipalByEmail_(next.email);
       if (clash && normalizeId_(clash.teacher_id) !== normalizeId_(teacherId)) {
-        throw appError_('DUPLICATE', 'A teacher with that email address already exists.');
+        throw appError_('DUPLICATE', 'A person with that email address already exists.');
       }
     }
-    if (payload.role !== undefined) next.role = requireRole_(payload.role);
     if (payload.active !== undefined) next.active = payload.active === true;
 
-    updateRow_(SHEETS.TEACHERS, { __row: existing.__row, row: next });
-    return { teacher: dtoTeacher_(next) };
+    updateRow_(sheetName, { __row: existing.__row, row: next });
+    return { teacher: dtoTeacher_(next, role) };
   });
 }
 

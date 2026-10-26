@@ -342,7 +342,31 @@ VITE_API_URL=<Apps Script web app URL>
 ```
 
 Copy `.env.example` to `.env` and fill in both values. Role, class access and
-teacher status are decided by the backend against the `Teachers` sheet.
+account status are decided by the backend using the separate `Teachers` and
+`Admins` sheets.
+
+### People Sheets and ID Assignment
+
+The backend keeps teachers and administrators in separate tabs:
+
+| Sheet | ID column | Format | Sequence |
+| --- | --- | --- | --- |
+| `Teachers` | `teacher_id` | `TCH-0001`, `TCH-0002`, … | Independent teacher sequence |
+| `Admins` | `admin_id` | `ADM-0001`, `ADM-0002`, … | Independent admin sequence |
+
+IDs are assigned by the backend when an admin adds an account. Do not assign an
+ID already in use or change the script properties that store the next sequence.
+Emails must be unique across both sheets. Login role is determined by which
+sheet contains the account.
+
+When upgrading an existing mixed-role `Teachers` sheet, back up the spreadsheet,
+deploy the updated Apps Script backend, and run `ping_` once from the Apps Script
+editor. The migration moves admin rows to `Admins`, assigns new role-specific
+IDs, and updates teacher IDs in `Classes`, `ClassTeachers`, and `Sessions`.
+If a legacy admin is assigned as a class/session teacher, the migration stops
+and asks you to reassign those records to a teacher first. See
+[`apps-script/SETUP.md`](./apps-script/SETUP.md) for the complete migration steps.
+Because the migration assigns new IDs, all users must sign in again afterward.
 
 ### Key Dependencies
 

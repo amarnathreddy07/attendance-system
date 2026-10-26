@@ -8,6 +8,7 @@ import { Icons, Icon } from '../components/icons.jsx';
 
 const TABS = [
   { id: 'teachers', label: 'Teachers' },
+  { id: 'admins', label: 'Admins' },
   { id: 'classes', label: 'Classes' },
   { id: 'students', label: 'Students' },
   { id: 'reports', label: 'Reports' },
@@ -18,26 +19,26 @@ function ErrorNote({ error }) {
   return <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>;
 }
 
-function TeachersTab({ pushToast }) {
-  const [teachers, setTeachers] = useState(null);
+function PeopleTab({ role, pushToast }) {
+  const [people, setPeople] = useState(null);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ name: '', email: '', role: 'teacher' });
+  const [form, setForm] = useState({ name: '', email: '' });
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     try {
       const data = await api.adminGetTeachers();
-      setTeachers(data.teachers);
+      setPeople(role === 'admin' ? data.admins : data.teachers);
       setError('');
     } catch (err) {
       setError(err.message);
-      setTeachers([]);
+      setPeople([]);
     }
   };
 
   useEffect(() => {
     load();
-  }, []);
+  }, [role]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -46,11 +47,11 @@ function TeachersTab({ pushToast }) {
       await api.adminCreateTeacher({
         name: form.name.trim(),
         email: form.email.trim(),
-        role: form.role,
+        role,
         active: true,
       });
-      setForm({ name: '', email: '', role: 'teacher' });
-      pushToast({ type: 'success', title: 'Teacher added' });
+      setForm({ name: '', email: '' });
+      pushToast({ type: 'success', title: `${role === 'admin' ? 'Admin' : 'Teacher'} added` });
       await load();
     } catch (err) {
       setError(err.message);
@@ -59,13 +60,17 @@ function TeachersTab({ pushToast }) {
     }
   };
 
-  const toggleActive = async (teacher) => {
+  const toggleActive = async (person) => {
     try {
-      await api.adminUpdateTeacher({ teacher_id: teacher.teacher_id, active: !teacher.active });
+      await api.adminUpdateTeacher({
+        teacher_id: person.teacher_id,
+        role,
+        active: !person.active,
+      });
       pushToast({
         type: 'success',
-        title: teacher.active ? 'Access revoked' : 'Access restored',
-        message: teacher.name,
+        title: person.active ? 'Access revoked' : 'Access restored',
+        message: person.name,
       });
       await load();
     } catch (err) {
@@ -76,8 +81,10 @@ function TeachersTab({ pushToast }) {
   return (
     <div className="space-y-6">
       <form onSubmit={submit} className="card p-5">
-        <h3 className="mb-4 text-base font-semibold text-slate-900">Add a teacher</h3>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <h3 className="mb-4 text-base font-semibold text-slate-900">
+          Add {role === 'admin' ? 'an admin' : 'a teacher'}
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-3">
           <input
             className="input"
             placeholder="Full name"
@@ -93,72 +100,60 @@ function TeachersTab({ pushToast }) {
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             required
           />
-          <select
-            className="input"
-            value={form.role}
-            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-          >
-            <option value="teacher">Teacher</option>
-            <option value="admin">Admin</option>
-          </select>
           <button className="btn-primary" disabled={busy}>
-            {busy ? 'Adding…' : 'Add teacher'}
+            {busy ? 'Adding…' : `Add ${role === 'admin' ? 'admin' : 'teacher'}`}
           </button>
         </div>
         <ErrorNote error={error} />
       </form>
 
-      {teachers === null ? (
+      {people === null ? (
         <Spinner />
-      ) : teachers.length === 0 ? (
-        <EmptyState icon={Icons.clipboard} title="No teachers yet" message="Add the first teacher above." />
+      ) : people.length === 0 ? (
+        <EmptyState
+          icon={Icons.clipboard}
+          title={`No ${role === 'admin' ? 'admins' : 'teachers'} yet`}
+          message={`Add the first ${role === 'admin' ? 'admin' : 'teacher'} above.`}
+        />
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="px-4 py-2.5">ID</th>
                   <th className="px-4 py-2.5">Name</th>
                   <th className="px-4 py-2.5">Email</th>
-                  <th className="px-4 py-2.5">Role</th>
-                  <th className="px-4 py-2.5">Classes</th>
+                  {role === 'teacher' && <th className="px-4 py-2.5">Classes</th>}
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5 text-right">Access</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {teachers.map((teacher) => (
-                  <tr key={teacher.teacher_id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5 font-medium text-slate-900">{teacher.name}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{teacher.email}</td>
+                {people.map((person) => (
+                  <tr key={person.teacher_id} className="hover:bg-slate-50/60">
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{person.teacher_id}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-900">{person.name}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{person.email}</td>
+                    {role === 'teacher' && (
+                      <td className="px-4 py-2.5 text-slate-600">{person.class_count}</td>
+                    )}
                     <td className="px-4 py-2.5">
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          teacher.role === 'admin'
-                            ? 'bg-brand-50 text-brand-700'
-                            : 'bg-slate-100 text-slate-600'
+                          person.active ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                         }`}
                       >
-                        {teacher.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600">{teacher.class_count}</td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          teacher.active ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                        }`}
-                      >
-                        {teacher.active ? 'Active' : 'Suspended'}
+                        {person.active ? 'Active' : 'Suspended'}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <button
                         type="button"
-                        className={teacher.active ? 'btn-secondary py-1 text-xs' : 'btn-primary py-1 text-xs'}
-                        onClick={() => toggleActive(teacher)}
+                        className={person.active ? 'btn-secondary py-1 text-xs' : 'btn-primary py-1 text-xs'}
+                        onClick={() => toggleActive(person)}
                       >
-                        {teacher.active ? 'Suspend' : 'Restore'}
+                        {person.active ? 'Suspend' : 'Restore'}
                       </button>
                     </td>
                   </tr>
@@ -611,7 +606,8 @@ export default function Admin() {
   const { pushToast } = useApp();
 
   const body = useMemo(() => {
-    if (tab === 'teachers') return <TeachersTab pushToast={pushToast} />;
+    if (tab === 'teachers') return <PeopleTab role="teacher" pushToast={pushToast} />;
+    if (tab === 'admins') return <PeopleTab role="admin" pushToast={pushToast} />;
     if (tab === 'classes') return <ClassesTab pushToast={pushToast} />;
     if (tab === 'students') return <StudentsTab pushToast={pushToast} />;
     return <ReportsTab />;
