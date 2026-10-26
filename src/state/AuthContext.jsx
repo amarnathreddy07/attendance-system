@@ -118,13 +118,14 @@ export function AuthProvider({ children }) {
       setReady(true);
       return;
     }
+    let bootstrapToken = null;
     try {
-      const token = await getSetting(TOKEN_KEY);
-      if (!token) {
+      bootstrapToken = await getSetting(TOKEN_KEY);
+      if (!bootstrapToken) {
         setReady(true);
         return;
       }
-      setSessionToken(token);
+      setSessionToken(bootstrapToken);
       const data = await api.getCurrentUser();
       if (!mounted.current) return;
       setUser(data.user);
@@ -133,9 +134,20 @@ export function AuthProvider({ children }) {
       // Populate the Dexie cache from the backend (best-effort).
       syncDown().catch((error) => console.error('Could not refresh local data.', error));
     } catch (error) {
-      resetSession();
-      await setSetting(TOKEN_KEY, null);
-      if (mounted.current) setUser(null);
+      if (
+        error instanceof ApiError &&
+        error.code === 'UNAUTHENTICATED' &&
+        bootstrapToken &&
+        getSessionToken() === bootstrapToken
+      ) {
+        resetSession();
+        if ((await getSetting(TOKEN_KEY)) === bootstrapToken) {
+          await setSetting(TOKEN_KEY, null);
+        }
+        if (mounted.current) setUser(null);
+      } else {
+        console.error('Could not validate the saved session.', error);
+      }
     } finally {
       if (mounted.current) setReady(true);
     }
