@@ -72,13 +72,16 @@ export default function AttendanceReview() {
           })),
         });
         const outcome = await syncNow();
+        const queued = outcome.remaining > 0;
+        const failureMessage = outcome.errors?.[0]?.message;
         pushToast({
-          type: 'success',
-          title: outcome.failed ? 'Saved locally, will sync' : 'Attendance submitted',
-          message:
-            outcome.failed > 0
-              ? 'The backend was unreachable. Your records are queued and will retry automatically.'
-              : 'Attendance is recorded in the class sheet.',
+          type: queued ? 'error' : 'success',
+          title: queued ? 'Attendance saved locally; sync needs attention' : 'Attendance submitted',
+          message: queued
+            ? failureMessage
+              ? `${failureMessage} This item remains queued and will retry automatically.`
+              : 'Your attendance is queued and will retry automatically when the connection is available.'
+            : 'Attendance is recorded in the class sheet.',
         });
         navigate(`/classes/${id}/history`);
       } catch (err) {

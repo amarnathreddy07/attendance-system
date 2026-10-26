@@ -20,7 +20,7 @@ function Section({ title, subtitle, children }) {
 
 export default function Settings() {
   const { pushToast, teacher, isAdmin, pendingSync, syncNow } = useApp();
-  const { signOut } = useAuth();
+  const { signOut, lastSyncResult } = useAuth();
 
   const [importOpen, setImportOpen] = useState(false);
   const [importError, setImportError] = useState('');
@@ -68,18 +68,26 @@ export default function Settings() {
               </p>
             </div>
           </div>
+          {lastSyncResult?.errors?.[0] && (
+            <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              Last sync error: {lastSyncResult.errors[0].message}
+            </p>
+          )}
           <div className="mt-4 flex justify-end gap-2">
             <button
               className="btn-secondary"
               onClick={async () => {
                 try {
                   const result = await syncNow();
+                  const failureMessage = result.errors?.[0]?.message;
                   pushToast({
-                    type: result.failed ? 'error' : 'success',
-                    title: result.failed ? 'Some changes could not sync' : 'Sync complete',
+                    type: result.remaining > 0 ? 'error' : 'success',
+                    title: result.remaining > 0 ? 'Some changes remain queued' : 'Sync complete',
                     message:
-                      result.failed > 0
-                        ? `${result.failed} item(s) are queued and will retry automatically.`
+                      result.remaining > 0
+                        ? failureMessage
+                          ? `${failureMessage} ${result.remaining} item(s) remain queued and will retry automatically.`
+                          : `${result.remaining} item(s) remain queued and will retry automatically.`
                         : `${result.synced} change(s) sent to the class sheet.`,
                   });
                 } catch (err) {

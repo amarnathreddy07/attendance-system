@@ -134,6 +134,7 @@ export async function flushSyncQueue() {
 
   let synced = 0;
   let failed = 0;
+  const errors = [];
 
   for (const row of pending) {
     try {
@@ -163,11 +164,16 @@ export async function flushSyncQueue() {
       }
       await markFailed(row, error);
       failed += 1;
+      errors.push({
+        operationId: row.id,
+        code: error instanceof ApiError ? error.code : 'UNKNOWN',
+        message: error?.message || String(error),
+      });
     }
   }
 
   const remaining = await db.sync_queue.where('sync_status').anyOf(SYNC_STATUS.PENDING, SYNC_STATUS.FAILED).count();
-  return { synced, failed, remaining };
+  return { synced, failed, remaining, errors };
 }
 
 export async function pendingCount() {
