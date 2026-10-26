@@ -36,33 +36,11 @@ export function AuthProvider({ children }) {
   const [syncState, setSyncState] = useState({ pending: 0, lastResult: null });
   const mounted = useRef(true);
   const syncInFlight = useRef(null);
-  const authChannel = useRef(null);
 
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return undefined;
-    const channel = new BroadcastChannel('attendance-auth');
-    authChannel.current = channel;
-    channel.onmessage = async ({ data }) => {
-      if (data?.type === 'signed-in' && data.token && data.user) {
-        setSessionToken(data.token);
-        await setSetting(TOKEN_KEY, data.token);
-        if (mounted.current) setUser(data.user);
-      } else if (data?.type === 'signed-out') {
-        resetSession();
-        await setSetting(TOKEN_KEY, null);
-        if (mounted.current) setUser(null);
-      }
-    };
-    return () => {
-      authChannel.current = null;
-      channel.close();
     };
   }, []);
 
@@ -194,19 +172,13 @@ export function AuthProvider({ children }) {
     try {
       const data = await api.login(idToken);
       setSessionToken(data.session_token);
-      const current = await api.getCurrentUser();
       await setSetting(TOKEN_KEY, data.session_token);
-      setUser(current.user);
-      authChannel.current?.postMessage({
-        type: 'signed-in',
-        token: data.session_token,
-        user: current.user,
-      });
+      setUser(data.user);
       // Attendance marked while signed out is still queued; drain it now,
       // then pull the roster so the UI matches the backend.
       syncNow();
       syncDown().catch(() => {});
-      return current.user;
+      return data.user;
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : 'Sign-in failed. Please try again.');
       throw error;
@@ -225,7 +197,6 @@ export function AuthProvider({ children }) {
     resetSession();
     await setSetting(TOKEN_KEY, null);
     if (mounted.current) setUser(null);
-    authChannel.current?.postMessage({ type: 'signed-out' });
   }, []);
 
   /** Renders the Google button into `element`; returns a cleanup function. */
