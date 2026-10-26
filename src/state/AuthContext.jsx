@@ -50,6 +50,15 @@ export function AuthProvider({ children }) {
     return count;
   }, []);
 
+  const expireSession = useCallback(async (error) => {
+    resetSession();
+    if (mounted.current) {
+      setUser(null);
+      setAuthError(error.message);
+    }
+    await setSetting(TOKEN_KEY, null);
+  }, []);
+
   const syncNow = useCallback(() => {
     if (syncInFlight.current) return syncInFlight.current;
 
@@ -57,6 +66,10 @@ export function AuthProvider({ children }) {
       const result = await flushSyncQueue();
       if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
       await refreshPending();
+      const authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
+      if (authError) {
+        await expireSession(new ApiError(authError.code, authError.message));
+      }
       if (result.synced > 0) {
         syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
       }
@@ -67,7 +80,7 @@ export function AuthProvider({ children }) {
       syncInFlight.current = null;
     });
     return syncInFlight.current;
-  }, [refreshPending]);
+  }, [expireSession, refreshPending]);
 
   /** Restores a stored session and validates it against the backend. */
   const bootstrap = useCallback(async () => {
