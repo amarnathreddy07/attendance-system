@@ -20,11 +20,12 @@ export async function getTeacher() {
   return all[0] || null;
 }
 
-export async function createTeacher({ name, email }) {
+export async function createTeacher({ name, email, role = 'teacher' }) {
   const teacher = {
     id: uid('tch'),
     name: name.trim(),
     email: (email || '').trim(),
+    role,
     created_at: nowIso(),
   };
   await db.teachers.clear();
@@ -35,7 +36,12 @@ export async function createTeacher({ name, email }) {
 export async function updateTeacher(partial) {
   const teacher = await getTeacher();
   if (!teacher) return null;
-  const next = { ...teacher, ...partial, name: partial.name?.trim() ?? teacher.name };
+  const next = {
+    ...teacher,
+    ...partial,
+    name: partial.name?.trim() ?? teacher.name,
+    role: partial.role ?? teacher.role,
+  };
   await db.teachers.put(next);
   return next;
 }
