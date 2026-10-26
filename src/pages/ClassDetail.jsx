@@ -16,7 +16,7 @@ import Modal, { Confirm } from '../components/Modal.jsx';
 import Dropdown from '../components/Dropdown.jsx';
 import { Icons, Icon } from '../components/icons.jsx';
 import { DEFAULT_ATTENDANCE_THRESHOLD, clampThreshold, formatDate, getRiskLevel } from '../lib/utils.js';
-import { buildAttendanceMatrixCsv, downloadCsv } from '../lib/attendanceCsv.js';
+import { buildAttendanceMatrixCsv, downloadCsv, toCsv } from '../lib/attendanceCsv.js';
 
 function StudentForm({ open, onClose, student, classId, onSaved }) {
   const [app, setApp] = useState(student?.application_number || '');
@@ -178,7 +178,9 @@ export default function ClassDetail() {
     const percentages = activeStudents.map((student) => {
       let present = 0;
       for (const session of completedSessions) {
-        const record = (attendanceRecords?.[session.id] || []).find((record) => record.student_id === student.id);
+        const record = (attendanceRecords?.[session.id] || []).find(
+          (record) => record.student_id === student.id || (student.backend_student_id && record.student_id === student.backend_student_id)
+        );
         if (record?.status === RECORD_STATUS.PRESENT || record?.status === RECORD_STATUS.OD) present += 1;
       }
       return {
@@ -286,7 +288,7 @@ export default function ClassDetail() {
         student.status === STUDENT_STATUS.ACTIVE ? 'Active' : 'Inactive',
       ]);
     }
-    downloadCsv(`${(klass.class_name || 'class').replace(/\s+/g, '-').toLowerCase()}-roster.csv`, rows.map((row) => row.join(',')).join('\n'));
+    downloadCsv(`${(klass.class_name || 'class').replace(/\s+/g, '-').toLowerCase()}-roster.csv`, toCsv(rows));
     pushToast({ type: 'success', title: 'Roster exported', message: 'Downloaded a local CSV file.' });
   };
 

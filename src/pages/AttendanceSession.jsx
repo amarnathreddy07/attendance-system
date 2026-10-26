@@ -45,6 +45,9 @@ function Legend({ dark = false }) {
         <KeyCap dark={dark}>A</KeyCap> <span className="text-slate-400">→</span> Absent
       </span>
       <span className="flex items-center gap-1.5">
+        <KeyCap dark={dark}>O</KeyCap> <span className="text-slate-400">→</span> OD
+      </span>
+      <span className="flex items-center gap-1.5">
         <KeyCap dark={dark}>→</KeyCap> / <KeyCap dark={dark}>Next</KeyCap> <span className="text-slate-400">→</span> Present + Forward
       </span>
       <span className="flex items-center gap-1.5">
@@ -170,6 +173,10 @@ export default function AttendanceSession() {
     if (firstUnmarked !== -1) setIndex(firstUnmarked);
   };
 
+  const exitPresentation = () => {
+    setPresentationMode(false);
+  };
+
   useEffect(() => {
     document.body.classList.toggle('presentation-mode', presentationMode);
     if (presentationMode && document.documentElement.requestFullscreen) {
@@ -211,6 +218,8 @@ export default function AttendanceSession() {
         e.key === ' ' ||
         e.key === 'a' ||
         e.key === 'A' ||
+        e.key === 'o' ||
+        e.key === 'O' ||
         e.key === 'ArrowLeft' ||
         e.key === 'Backspace' ||
         e.key === 'ArrowUp' ||
@@ -231,7 +240,7 @@ export default function AttendanceSession() {
       } else if (e.key === 'Backspace' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         goPrevious();
       } else if (presentationMode && e.key === 'Escape') {
-        setPresentationMode(false);
+        exitPresentation();
       }
     };
     onKeyRef.current = onKey;
@@ -399,7 +408,7 @@ export default function AttendanceSession() {
               <button className="btn-secondary border-slate-600 bg-slate-900 text-slate-100" onClick={goPrevious} disabled={index === 0}>
                 ← Previous
               </button>
-              <button className="btn-primary" onClick={() => setPresentationMode(false)}>
+              <button className="btn-primary" onClick={exitPresentation}>
                 Exit Presentation Mode
               </button>
             </div>

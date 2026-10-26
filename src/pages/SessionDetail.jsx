@@ -39,7 +39,7 @@ export default function SessionDetail() {
   const absent = list.filter((x) => x.status === RECORD_STATUS.ABSENT).length;
   const odCount = list.filter((x) => x.status === RECORD_STATUS.OD).length;
   const notMarked = list.filter((x) => !x.status).length;
-  const pct = list.length ? ((present / list.length) * 100).toFixed(1) : '0.0';
+  const pct = list.length ? (((present + odCount) / list.length) * 100).toFixed(1) : '0.0';
 
   const toggleStatus = async (studentId, newStatus) => {
     setLocalStatuses((prev) => ({ ...prev, [studentId]: newStatus }));
@@ -64,7 +64,7 @@ export default function SessionDetail() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <BackLink to="/history" label="Attendance History" />
+      <BackLink to={`/classes/${id}/history`} label="Attendance History" />
 
       <div className="mt-4 flex items-start justify-between">
         <div>

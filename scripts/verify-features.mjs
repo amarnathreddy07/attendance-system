@@ -22,7 +22,16 @@ function check(name, pass, details = '') {
 function searchInFile(filePath, patterns) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    return patterns.map(p => typeof p === 'string' ? content.includes(p) : p.test(content));
+    return patterns.map(p => {
+      if (p instanceof RegExp) return p.test(content);
+      if (typeof p === 'string') {
+        if (p.includes('|') || p.includes('.*')) {
+          return new RegExp(p, 'i').test(content);
+        }
+        return content.toLowerCase().includes(p.toLowerCase());
+      }
+      return false;
+    });
   } catch (e) {
     return patterns.map(() => false);
   }

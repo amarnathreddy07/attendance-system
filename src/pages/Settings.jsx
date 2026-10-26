@@ -204,116 +204,85 @@ export default function Settings() {
         </div>
       </Modal>
 
-      <Modal
-        open={clearOpen}
-        onClose={() => {
-          setClearOpen(false);
-          setClearStep('backup');
-          setClearConfirmCode('');
-          setClearUserInput('');
-        }}
-        title={clearStep === 'backup' ? 'Create a backup first?' : 'Clear all local data?'}
-        size="sm"
-      >
-        {clearStep === 'backup' ? (
-          <>
-            <p className="text-sm leading-6 text-slate-600">
-              Since you are deleting everything, are you sure you don't want a backup? You can export your data now or continue without it.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => {
+      {clearStep === 'confirm' ? (
+        <Confirm
+          open={clearOpen}
+          onClose={() => {
+            setClearOpen(false);
+            setClearStep('backup');
+            setClearConfirmCode('');
+            setClearUserInput('');
+          }}
+          onConfirm={async () => {
+            try {
+              await Promise.all(
+                ['teachers', 'classes', 'students', 'attendance_sessions', 'attendance_records', 'settings', 'sync_queue'].map((t) =>
+                  db.table(t).clear()
+                )
+              );
+              setClearOpen(false);
+              pushToast({ type: 'info', title: 'All data cleared', message: 'You can set up your profile again.' });
+              window.location.reload();
+            } catch (err) {
+              pushToast({ type: 'error', title: 'Error clearing data', message: err.message });
+            }
+          }}
+          title="Clear all local data?"
+          message="This permanently deletes your profile, classes, students and attendance from this browser."
+          confirmLabel="Clear Everything"
+          danger
+          confirmCode={clearConfirmCode}
+          userInput={clearUserInput}
+          onInputChange={setClearUserInput}
+        />
+      ) : (
+        <Modal
+          open={clearOpen}
+          onClose={() => {
+            setClearOpen(false);
+            setClearStep('backup');
+            setClearConfirmCode('');
+            setClearUserInput('');
+          }}
+          title="Create a backup first?"
+          size="sm"
+        >
+          <p className="text-sm leading-6 text-slate-600">
+            Since you are deleting everything, are you sure you don't want a backup? You can export your data now or continue without it.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button
+              className="btn-secondary"
+              onClick={() => {
                 setClearStep('confirm');
-                const code = String(Math.floor(Math.random() * 90000) + 10000);
+                const code = String(Math.floor(Math.random() * 9000) + 1000);
                 setClearConfirmCode(code);
                 setClearUserInput('');
-              }}>
-                Continue Without Backup
-              </button>
-              <button
-                className="btn-primary"
-                onClick={async () => {
-                  try {
-                    const backup = await exportBackup();
-                    downloadBackup(backup);
-                    pushToast({ type: 'success', title: 'Backup exported', message: 'Downloaded a local backup file.' });
-                    setClearStep('confirm');
-                    const code = String(Math.floor(Math.random() * 90000) + 10000);
-                    setClearConfirmCode(code);
-                    setClearUserInput('');
-                  } catch (err) {
-                    pushToast({ type: 'error', title: 'Export failed', message: err.message });
-                  }
-                }}
-              >
-                <Icon d={Icons.download} className="h-4 w-4" /> Export Backup
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-sm leading-6 text-slate-600">
-              This permanently deletes your profile, classes, students and attendance from this browser.
-            </p>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-lg border-2 border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Type these numbers to confirm:</p>
-                <p className="mt-2 font-mono text-2xl font-black text-amber-900">{clearConfirmCode.split('').join(' ')}</p>
-              </div>
-              <div>
-                <label className="label text-sm" htmlFor="clear-confirm-input">
-                  Confirmation Code
-                </label>
-                <input
-                  id="clear-confirm-input"
-                  type="text"
-                  className="input font-mono text-lg tracking-wider"
-                  placeholder="Enter the numbers above"
-                  value={clearUserInput}
-                  onChange={(e) => setClearUserInput(e.target.value)}
-                  autoComplete="off"
-                  autoFocus
-                />
-                {clearUserInput && clearUserInput !== clearConfirmCode && (
-                  <p className="mt-2 text-xs font-medium text-rose-600">Numbers don't match</p>
-                )}
-                {clearUserInput === clearConfirmCode && (
-                  <p className="mt-2 text-xs font-medium text-emerald-600">Verified — ready to delete</p>
-                )}
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => {
-                setClearOpen(false);
-                setClearStep('backup');
-                setClearConfirmCode('');
-                setClearUserInput('');
-              }}>
-                Cancel
-              </button>
-              <button
-                className="btn-danger"
-                disabled={clearUserInput !== clearConfirmCode}
-                onClick={async () => {
-                  try {
-                    await Promise.all(
-                      ['teachers', 'classes', 'students', 'attendance_sessions', 'attendance_records', 'settings'].map((t) =>
-                        db.table(t).clear()
-                      )
-                    );
-                    setClearOpen(false);
-                    pushToast({ type: 'info', title: 'All data cleared', message: 'You can set up your profile again.' });
-                    window.location.reload();
-                  } catch (err) {
-                    pushToast({ type: 'error', title: 'Error clearing data', message: err.message });
-                  }
-                }}
-              >
-                Clear Everything
-              </button>
-            </div>
-          </>
-        )}
-      </Modal>
+              }}
+            >
+              Continue Without Backup
+            </button>
+            <button
+              className="btn-primary"
+              onClick={async () => {
+                try {
+                  const backup = await exportBackup();
+                  downloadBackup(backup);
+                  pushToast({ type: 'success', title: 'Backup exported', message: 'Downloaded a local backup file.' });
+                  setClearStep('confirm');
+                  const code = String(Math.floor(Math.random() * 9000) + 1000);
+                  setClearConfirmCode(code);
+                  setClearUserInput('');
+                } catch (err) {
+                  pushToast({ type: 'error', title: 'Export failed', message: err.message });
+                }
+              }}
+            >
+              <Icon d={Icons.download} className="h-4 w-4" /> Export Backup
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -23,7 +23,7 @@ var HTTP_FETCH_ = function (url) {
 };
 
 function handleLogin_(ctx) {
-  var idToken = requireString_(ctx.body.id_token, 'id_token');
+  var idToken = requireString_(ctx.body.id_token, 'id_token', 4096);
   var profile = verifyGoogleIdToken_(idToken);
 
   var config = getConfig_();

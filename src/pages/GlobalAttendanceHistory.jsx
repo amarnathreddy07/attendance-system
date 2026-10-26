@@ -9,7 +9,7 @@ import { Icons, Icon } from '../components/icons.jsx';
 
 function SessionRow({ session, className, counts, sessionLabel }) {
   const navigate = useNavigate();
-  const pct = counts.total ? ((counts.present / counts.total) * 100).toFixed(1) : '0.0';
+  const pct = counts.total ? (((counts.present + (counts.od || 0)) / counts.total) * 100).toFixed(1) : '0.0';
   const day = fromDateKey(session.date);
   return (
     <button

@@ -8,12 +8,13 @@
 var MAX_RECORDS_PER_SUBMIT = 400;
 var MAX_STUDENTS_PER_IMPORT = 1000;
 
-function requireString_(value, field) {
+function requireString_(value, field, maxLength) {
+  var limit = maxLength || 500;
   var text = String(value == null ? '' : value).trim();
   if (!text) {
     throw appError_('VALIDATION_ERROR', 'Field "' + field + '" is required.');
   }
-  if (text.length > 500) {
+  if (text.length > limit) {
     throw appError_('VALIDATION_ERROR', 'Field "' + field + '" is too long.');
   }
   return text;

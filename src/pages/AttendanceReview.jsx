@@ -66,9 +66,9 @@ export default function AttendanceReview() {
           classId: id,
           sessionId: session.id,
           date: session.date,
-          records: list.map((student) => ({
-            student_id: student.id,
-            status: student.status || RECORD_STATUS.PRESENT,
+          records: list.map((item) => ({
+            student_id: item.student.id,
+            status: item.status || RECORD_STATUS.PRESENT,
           })),
         });
         const outcome = await flushSyncQueue();
@@ -81,6 +81,12 @@ export default function AttendanceReview() {
               : 'Attendance is recorded in the class sheet.',
         });
         navigate(`/classes/${id}/history`);
+      } catch (err) {
+        pushToast({
+          type: 'error',
+          title: 'Could not submit attendance',
+          message: err?.message || 'An error occurred while submitting.',
+        });
       } finally {
         setSubmitting(false);
       }

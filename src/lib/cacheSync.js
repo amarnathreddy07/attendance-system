@@ -99,7 +99,21 @@ async function upsertStudent(classId, student) {
         (row.prn_number && row.prn_number === student.prn_number))
   );
   if (match) {
-    await db.students.put({ ...match, backend_student_id: student.student_id, sync: 'synced', updated_at: nowIso() });
+    if (match.id !== student.student_id) {
+      const oldRecords = await db.attendance_records.where('student_id').equals(match.id).toArray();
+      for (const rec of oldRecords) {
+        await db.attendance_records.put({ ...rec, student_id: student.student_id, updated_at: nowIso() });
+      }
+      await db.students.delete(match.id);
+    }
+    await db.students.put({
+      ...match,
+      ...student,
+      id: student.student_id,
+      backend_student_id: student.student_id,
+      sync: 'synced',
+      updated_at: nowIso(),
+    });
     return;
   }
 

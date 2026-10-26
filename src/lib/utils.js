@@ -82,7 +82,7 @@ export function getStudentAttendancePercentage(studentId, sessions = [], records
   let present = 0;
   for (const session of completed) {
     const entry = recordsBySession?.[session.id]?.find((record) => record.student_id === studentId);
-    if (entry?.status === 'present') present += 1;
+    if (entry?.status === 'present' || entry?.status === 'od') present += 1;
   }
   return (present / completed.length) * 100;
 }

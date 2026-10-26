@@ -95,8 +95,9 @@ export default function AttendanceHistory() {
         sessionLabel,
         counts: {
           total: total ?? recs.length,
-          present: recs.filter((r) => r.status === RECORD_STATUS.PRESENT).length,
+          present: recs.filter((r) => r.status === RECORD_STATUS.PRESENT || r.status === RECORD_STATUS.OD).length,
           absent: recs.filter((r) => r.status === RECORD_STATUS.ABSENT).length,
+          od: recs.filter((r) => r.status === RECORD_STATUS.OD).length,
         },
       };
     });

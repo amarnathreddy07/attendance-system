@@ -133,7 +133,9 @@ export async function deleteStudent(id) {
 
 export async function bulkImportStudents(class_id, students) {
   const existing = await db.students.where('class_id').equals(class_id).toArray();
-  const byApp = new Map(existing.map((s) => [s.application_number, s]));
+  const byApp = new Map(existing.filter((s) => s.application_number).map((s) => [s.application_number, s]));
+  const byRoll = new Map(existing.filter((s) => s.roll_number).map((s) => [s.roll_number, s]));
+  const byPrn = new Map(existing.filter((s) => s.prn_number).map((s) => [s.prn_number, s]));
   const added = [];
   const updated = [];
   await db.transaction('rw', db.students, async () => {
@@ -148,13 +150,25 @@ export async function bulkImportStudents(class_id, students) {
         status: s.status || STUDENT_STATUS.ACTIVE,
       };
       if (!data.name) continue;
-      const existingStudent = data.application_number ? byApp.get(data.application_number) : undefined;
+      const existingStudent =
+        (data.application_number && byApp.get(data.application_number)) ||
+        (data.roll_number && byRoll.get(data.roll_number)) ||
+        (data.prn_number && byPrn.get(data.prn_number));
       if (existingStudent) {
         await db.students.update(existingStudent.id, { ...data, updated_at: nowIso() });
         updated.push(existingStudent.id);
+        const merged = { ...existingStudent, ...data };
+        if (data.application_number) byApp.set(data.application_number, merged);
+        if (data.roll_number) byRoll.set(data.roll_number, merged);
+        if (data.prn_number) byPrn.set(data.prn_number, merged);
       } else {
-        await db.students.add({ id: uid('stu'), ...data, created_at: nowIso(), updated_at: nowIso() });
-        added.push(data.application_number);
+        const id = uid('stu');
+        const created = { id, ...data, created_at: nowIso(), updated_at: nowIso() };
+        await db.students.add(created);
+        added.push(data.application_number || data.roll_number || id);
+        if (data.application_number) byApp.set(data.application_number, created);
+        if (data.roll_number) byRoll.set(data.roll_number, created);
+        if (data.prn_number) byPrn.set(data.prn_number, created);
       }
     }
   });

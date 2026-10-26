@@ -63,6 +63,10 @@ export default function StudentHistory() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                     <Icon d={Icons.check} className="h-3.5 w-3.5" /> Present
                   </span>
+                ) : status === RECORD_STATUS.OD ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                    <Icon d={Icons.check} className="h-3.5 w-3.5" /> OD
+                  </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">
                     <Icon d={Icons.x} className="h-3.5 w-3.5" /> Absent

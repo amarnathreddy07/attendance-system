@@ -9,7 +9,7 @@ import {
   getSessionsForClass,
   getStudentsForClass,
 } from '../db/repositories.js';
-import { formatDate } from '../lib/utils.js';
+import { formatDate, fromDateKey } from '../lib/utils.js';
 import { exportClass, downloadClassExport } from '../lib/classExport.js';
 import { useApp } from '../state/AppContext.jsx';
 import Dropdown from '../components/Dropdown.jsx';
@@ -78,7 +78,7 @@ function ClassCard({ klass, navigate, onDelete }) {
         {lastSession ? (
           <span>
             Last attendance:{' '}
-            <span className="font-semibold text-slate-700">{formatDate(new Date(lastSession.date))}</span>
+            <span className="font-semibold text-slate-700">{formatDate(fromDateKey(lastSession.date))}</span>
           </span>
         ) : (
           <span className="text-slate-400">No attendance yet</span>
@@ -141,7 +141,7 @@ function ClassListItem({ klass, navigate, onDelete }) {
             {activeCount} student{activeCount === 1 ? '' : 's'}
           </span>
           <span>
-            {lastSession ? `Last: ${formatDate(new Date(lastSession.date))}` : 'No attendance yet'}
+            {lastSession ? `Last: ${formatDate(fromDateKey(lastSession.date))}` : 'No attendance yet'}
           </span>
         </div>
       </div>

@@ -341,8 +341,8 @@ export default function ClassSetup() {
               <input
                 id="cls-section"
                 className="input"
-                type="number"
-                placeholder="Section"
+                type="text"
+                placeholder="Section (e.g. A, 1)"
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
               />
