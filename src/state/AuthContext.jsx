@@ -3,7 +3,7 @@ import { api, ApiError, setSessionToken, resetSession } from '../lib/apiClient.j
 import { renderGoogleButton, unmountGoogleButton } from '../lib/googleAuth.js';
 import { flushSyncQueue, pendingCount } from '../lib/syncQueue.js';
 import { syncDown } from '../lib/cacheSync.js';
-import { getSetting, setSetting } from '../db/repositories.js';
+import { getSetting, setSetting, getTeacher, createTeacher } from '../db/repositories.js';
 import { GOOGLE_CLIENT_ID, API_URL, isBackendConfigured } from '../lib/env.js';
 
 const AuthContext = createContext(null);
@@ -62,6 +62,24 @@ export function AuthProvider({ children }) {
   /** Restores a stored session and validates it against the backend. */
   const bootstrap = useCallback(async () => {
     if (!isBackendConfigured()) {
+      // Local-only mode: use/create a local teacher profile
+      try {
+        let localTeacher = await getTeacher();
+        if (!localTeacher) {
+          localTeacher = await createTeacher({ name: 'Professor', email: '' });
+        }
+        if (mounted.current) {
+          setUser({
+            teacher_id: localTeacher.id,
+            name: localTeacher.name,
+            email: localTeacher.email,
+            role: 'teacher',
+            active: true,
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
       setReady(true);
       return;
     }
