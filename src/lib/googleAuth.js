@@ -48,6 +48,7 @@ export async function renderGoogleButton(element, { onSuccess, onError }) {
     onError?.(new Error('VITE_GOOGLE_CLIENT_ID is not set.'));
     return () => {};
   }
+  const availableWidth = element.parentElement?.clientWidth || 400;
 
   credentialCallback = (response) => {
     onSuccess?.(response.credential);
@@ -63,8 +64,8 @@ export async function renderGoogleButton(element, { onSuccess, onError }) {
     size: 'large',
     type: 'standard',
     text: 'signin_with',
-    width: 280,
-    shape: 'rectangular',
+    width: Math.min(400, Math.max(120, availableWidth)),
+    shape: 'pill',
     locale: 'en',
   });
 
