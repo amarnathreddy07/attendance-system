@@ -71,10 +71,14 @@ export default function Sidebar() {
               }`
             }
           >
-            <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'}`}>
-              <Icon d={link.icon} className="h-4 w-4" />
-            </span>
-            {link.label}
+            {({ isActive }) => (
+              <>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'}`}>
+                  <Icon d={link.icon} className="h-4 w-4" />
+                </span>
+                {link.label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -90,10 +94,14 @@ export default function Sidebar() {
             }`
           }
         >
-          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'}`}>
-            <Icon d={Icons.info} className="h-4 w-4" />
-          </span>
-          FAQ
+          {({ isActive }) => (
+            <>
+              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${isActive ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'}`}>
+                <Icon d={Icons.info} className="h-4 w-4" />
+              </span>
+              FAQ
+            </>
+          )}
         </NavLink>
 
         {pendingSync > 0 && (
