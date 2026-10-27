@@ -1,6 +1,6 @@
 # AttendIt — Teacher Attendance System
 
-A local-first, offline-friendly attendance management application for teachers. All data is stored privately on your device using the browser's IndexedDB database. No account required, no cloud backend, no server.
+A local-first, offline-friendly attendance management application for teachers. The app keeps a local IndexedDB cache for offline work and syncs classes, rosters, and attendance to a private Google spreadsheet through the Apps Script backend.
 
 **Deployment:** Vercel
 
@@ -10,7 +10,7 @@ A local-first, offline-friendly attendance management application for teachers. 
 
 ### Core Functionality
 
-- **Teacher Profile** — Create a simple profile on first launch (name and optional email).
+- **Teacher Sign-In** — Sign in with an authorized Google account.
 - **Class Management** — Create, edit, and manage multiple classes.
 - **Student Management** — Add students manually or import a CSV roster.
 - **Attendance Sessions** — Fast, keyboard-friendly attendance marking.
@@ -57,12 +57,13 @@ A local-first, offline-friendly attendance management application for teachers. 
 
 ### How It Works
 
-All attendance data (teacher profile, classes, students, sessions, records) is stored **locally in your browser** using IndexedDB.
+The browser stores a local IndexedDB cache for offline use. The configured Apps Script backend uses a private Google spreadsheet as the source of truth for shared class and attendance data.
 
-- **No cloud storage.** Data never leaves your device.
-- **No analytics.** Your attendance data is not tracked or analyzed.
-- **No authentication.** No account login required.
-- **No backend.** The deployed application is purely a frontend SPA.
+- Teachers sign in with an authorized Google account.
+- The spreadsheet contains shared `Classes`, `Students`, `Sessions`, and `Attendance` tabs.
+- Creating a class also creates a dedicated `Class_<class-id>` worksheet containing the class details and its attendance ledger. Attendance submissions and later corrections are mirrored to that worksheet.
+- Offline attendance is queued on the device and synced when connectivity returns. Creating or editing a class requires the backend to be reachable.
+- No analytics are collected by the app.
 
 ### Clearing Browser Data
 
@@ -76,10 +77,9 @@ Use the **Local Data** section in Settings to:
 
 ### Security & Backups
 
-- Backups are JSON files downloaded to your computer.
-- Backups are never uploaded anywhere.
-- You have full control over backup files.
-- Export backups regularly to avoid data loss.
+- Backups are JSON files downloaded to your computer. They are not uploaded by the backup feature. Export backups regularly to avoid data loss.
+
+The spreadsheet must remain restricted to authorized users. Follow [the Apps Script setup guide](./apps-script/SETUP.md) to configure access and deployment.
 
 ---
 

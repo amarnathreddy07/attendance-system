@@ -47,9 +47,18 @@ export async function updateTeacher(partial) {
 }
 
 // ---------------------------------------------------------------- Classes
-export async function addClass({ class_name, section, attendance_threshold, year, semester }) {
+export async function addClass({
+  class_name,
+  section,
+  attendance_threshold,
+  year,
+  semester,
+  id,
+  backend_class_id,
+}) {
   const klass = {
-    id: uid('cls'),
+    id: id || uid('cls'),
+    ...(backend_class_id ? { backend_class_id, sync: 'synced' } : {}),
     class_name: class_name.trim(),
     section: (section || '').trim(),
     year: year || '',

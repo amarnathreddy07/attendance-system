@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { callAction, createBackend, loginAs, setGoogleIdentity } from './harness.mjs';
-import { seed, ADMIN_ID } from './seed.mjs';
+import { seed, ADMIN_ID, HEADERS } from './seed.mjs';
 
 test('login issues a session for a known, active teacher', () => {
   const backend = createBackend({ data: seed() });
@@ -14,6 +14,79 @@ test('login issues a session for a known, active teacher', () => {
   assert.match(data.session_token, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
   // Backend clock is frozen at 2026-01-15; the default TTL is 24 hours.
   assert.equal(data.expires_at, '2026-01-16T09:00:00.000Z');
+});
+
+test('login issues a refresh token that renews the session silently', () => {
+  const backend = createBackend({ data: seed() });
+  const data = loginAs(backend, 'alice@example.edu');
+
+  assert.match(data.refresh_token, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  assert.equal(data.refresh_expires_at, '2026-02-14T09:00:00.000Z');
+
+  const renewed = callAction(backend, 'refreshSession', { refresh_token: data.refresh_token });
+  assert.equal(renewed.success, true);
+  assert.equal(renewed.data.user.email, 'alice@example.edu');
+  assert.notEqual(renewed.data.session_token, data.session_token);
+  assert.notEqual(renewed.data.refresh_token, data.refresh_token);
+
+  const after = callAction(backend, 'getTodayClasses', {}, renewed.data.session_token);
+  assert.equal(after.success, true);
+});
+
+test('a refresh token cannot be used as a session token', () => {
+  const backend = createBackend({ data: seed() });
+  const data = loginAs(backend, 'alice@example.edu');
+
+  const attempt = callAction(backend, 'getTodayClasses', {}, data.refresh_token);
+  assert.equal(attempt.success, false);
+  assert.equal(attempt.error.code, 'UNAUTHENTICATED');
+});
+
+test('an expired refresh token cannot renew a session', () => {
+  const backend = createBackend({ data: seed() });
+  const data = loginAs(backend, 'alice@example.edu');
+
+  backend.__ctx.NOW_ = () => new Date('2026-03-01T00:00:00.000Z');
+  const attempt = callAction(backend, 'refreshSession', { refresh_token: data.refresh_token });
+  assert.equal(attempt.success, false);
+  assert.equal(attempt.error.code, 'UNAUTHENTICATED');
+});
+
+test('a deactivated teacher cannot renew a session', () => {
+  const backend = createBackend({ data: seed() });
+  const data = loginAs(backend, 'alice@example.edu');
+
+  const teachers = backend.spreadsheet.table('Teachers');
+  const activeIndex = teachers.header.indexOf('active');
+  const aliceIndex = teachers.rows.findIndex((row) => row[0] === 'TCH-0001');
+  teachers.rows[aliceIndex][activeIndex] = 'FALSE';
+  backend.spreadsheet.sheets.Teachers.matrix = [teachers.header, ...teachers.rows];
+  backend.cache.clear();
+
+  const attempt = callAction(backend, 'refreshSession', { refresh_token: data.refresh_token });
+  assert.equal(attempt.success, false);
+  assert.equal(attempt.error.code, 'UNAUTHORIZED');
+});
+
+test('missing spreadsheet tabs are created automatically', () => {
+  const data = seed();
+  delete data.Admins;
+  delete data.Classes;
+  delete data.ClassTeachers;
+  delete data.Students;
+  delete data.Sessions;
+  delete data.Attendance;
+  delete data.SyncLog;
+  const backend = createBackend({ data });
+
+  const attempt = callAction(backend, 'getTodayClasses', {});
+  assert.equal(attempt.error.code, 'UNAUTHENTICATED');
+
+  Object.keys(HEADERS).forEach((name) => {
+    const table = backend.spreadsheet.table(name);
+    assert.ok(table, name + ' tab exists');
+    assert.deepEqual(table.header, HEADERS[name], name + ' headers');
+  });
 });
 
 test('login is case-insensitive on email', () => {

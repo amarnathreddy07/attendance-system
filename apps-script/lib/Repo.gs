@@ -27,8 +27,9 @@ function dtoClass_(klass, extra) {
     year: String(klass.year || '').trim(),
     semester: String(klass.semester || '').trim(),
     teacher_id: normalizeId_(klass.teacher_id),
-    attendance_threshold: Number(klass.attendance_threshold) || 75,
+    attendance_threshold: classAttendanceThreshold_(klass),
     active: klass.active === undefined ? true : normalizeBoolean_(klass.active) !== false,
+    attendance_sheet_name: classAttendanceSheetName_(klass.class_id),
   };
   if (extra) {
     Object.keys(extra).forEach(function (key) {
@@ -218,14 +219,18 @@ function submitAttendance_(user, input) {
   var replay = findByField_(SHEETS.SYNC_LOG, 'client_operation_id', input.clientOperationId);
   if (replay) {
     var previous = findById_(SHEETS.SESSIONS, input.sessionId);
-    return {
-      session_id: normalizeId_(input.sessionId),
-      written: 0,
-      updated: 0,
-      duplicate: true,
-      submitted_at: previous ? String(previous.submitted_at || '') : '',
-      class_id: normalizeId_(klass.class_id),
-    };
+    return withSheetLock_(function () {
+      invalidateTables_([SHEETS.ATTENDANCE, SHEETS.STUDENTS]);
+      syncClassAttendanceSheet_(klass);
+      return {
+        session_id: normalizeId_(input.sessionId),
+        written: 0,
+        updated: 0,
+        duplicate: true,
+        submitted_at: previous ? String(previous.submitted_at || '') : '',
+        class_id: normalizeId_(klass.class_id),
+      };
+    });
   }
 
   var studentIds = {};
@@ -320,6 +325,9 @@ function submitAttendance_(user, input) {
 
     var sessions = isNewSession ? appendRows_(SHEETS.SESSIONS, [sessionRow]) : [updateRowAndReturn_(sessionRow, session)];
 
+    invalidateTables_([SHEETS.ATTENDANCE, SHEETS.STUDENTS]);
+    syncClassAttendanceSheet_(klass);
+
     appendRows_(SHEETS.SYNC_LOG, [
       {
         client_operation_id: input.clientOperationId,
@@ -391,6 +399,16 @@ function updateAttendance_(user, records) {
 
   return withSheetLock_(function () {
     updateRowsByIndex_(SHEETS.ATTENDANCE, updates);
+    invalidateTables_([SHEETS.ATTENDANCE, SHEETS.STUDENTS]);
+    var changedClasses = {};
+    updates.forEach(function (entry) {
+      var sessionId = normalizeId_(entry.row.session_id);
+      var session = sessions[sessionId];
+      if (session) changedClasses[normalizeId_(session.class_id)] = classes[normalizeId_(session.class_id)];
+    });
+    Object.keys(changedClasses).forEach(function (classId) {
+      if (changedClasses[classId]) syncClassAttendanceSheet_(changedClasses[classId]);
+    });
     return { updated: updates.length };
   });
 }

@@ -69,6 +69,7 @@ async function post(action, body = {}) {
 
 export const api = {
   login: (idToken) => post('login', { id_token: idToken }),
+  refreshSession: (refreshToken) => post('refreshSession', { refresh_token: refreshToken }),
   getCurrentUser: () => post('getCurrentUser'),
 
   getTodayClasses: (date) => post('getTodayClasses', date ? { date } : {}),

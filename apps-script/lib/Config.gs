@@ -8,6 +8,7 @@
  *   GOOGLE_CLIENT_ID  OAuth client id the frontend is expected to use
  *   SESSION_SECRET   HMAC key for session tokens (generated on first use)
  *   SESSION_TTL_HOURS  session lifetime, default 24
+ *   REFRESH_TTL_DAYS  refresh-token lifetime, default 30
  *   ORG_EMAIL_DOMAIN optional extra restriction, e.g. university.edu
  *
  * Read them with:  Project Settings -> Script Properties.
@@ -15,6 +16,7 @@
 
 var SESSION_SECRET_KEY = 'SESSION_SECRET';
 var DEFAULT_SESSION_TTL_HOURS = 24;
+var DEFAULT_REFRESH_TTL_DAYS = 30;
 var CACHE_TTL_SECONDS = 45;
 var LOCK_TIMEOUT_MS = 20000;
 
@@ -29,6 +31,7 @@ function getConfig_() {
     googleClientId: String(props.getProperty('GOOGLE_CLIENT_ID') || '').trim(),
     orgEmailDomain: String(props.getProperty('ORG_EMAIL_DOMAIN') || '').trim().toLowerCase(),
     sessionTtlHours: Number(props.getProperty('SESSION_TTL_HOURS') || DEFAULT_SESSION_TTL_HOURS),
+    refreshTtlDays: Number(props.getProperty('REFRESH_TTL_DAYS') || DEFAULT_REFRESH_TTL_DAYS),
   };
 }
 

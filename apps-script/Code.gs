@@ -36,6 +36,7 @@ function handleRequest_(e, method) {
       method: method,
     };
 
+    ensureMissingSheets_();
     var data = route_(action, ctx);
     return jsonResponse_({ success: true, data: data === undefined ? null : data });
   } catch (err) {
@@ -65,6 +66,7 @@ function isAllowedAction_(action) {
 var ROUTES = {
   // --- auth -------------------------------------------------------------
   login: handleLogin_,
+  refreshSession: handleRefreshSession_,
   getCurrentUser: handleGetCurrentUser_,
 
   // --- teacher / shared -------------------------------------------------

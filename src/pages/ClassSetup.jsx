@@ -6,6 +6,8 @@ import { addClass, updateClass, bulkImportStudents } from '../db/repositories.js
 import { parseCsv } from '../lib/sample.js';
 import { parseStudentRows } from '../lib/studentSheet.js';
 import { parseClassExport } from '../lib/classExport.js';
+import { api } from '../lib/apiClient.js';
+import { syncDown } from '../lib/cacheSync.js';
 import { useApp } from '../state/AppContext.jsx';
 import { BackLink, Spinner, PageHeader } from '../components/ui.jsx';
 import { Icons, Icon } from '../components/icons.jsx';
@@ -86,81 +88,61 @@ export default function ClassSetup() {
       return;
     }
     try {
+      let backendClassId = klass?.backend_class_id || id;
       let classId = id;
       if (!classId) {
-        const created = await addClass({ class_name: name, section, year, semester, attendance_threshold: threshold });
+        const response = await api.createClass({
+          class_name: name,
+          section,
+          subject: '',
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
+        backendClassId = response.class.class_id;
+        const created = await addClass({
+          id: backendClassId,
+          backend_class_id: backendClassId,
+          class_name: name,
+          section,
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
         classId = created.id;
-        // Mirror the class into the backend so it can own attendance.
-        try {
-          const { api } = await import('../lib/apiClient.js');
-          await api.createClass({
-            class_name: name,
-            section,
-            subject: klass?.subject || '',
-            year,
-            semester,
-            attendance_threshold: threshold,
-          });
-        } catch (err) {
-          if (err?.code !== 'OFFLINE') {
-            // Non-fatal: the class stays local and will reconcile on next sync.
-            console.warn('Backend class create failed:', err?.message || err);
-          }
-        }
       } else {
+        await api.updateClass({
+          class_id: backendClassId,
+          class_name: name,
+          section,
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
         await updateClass(classId, { class_name: name, section, year, semester, attendance_threshold: threshold });
-        try {
-          const { api } = await import('../lib/apiClient.js');
-          await api.updateClass({
-            class_id: klass?.backend_class_id || classId,
-            class_name: name,
-            section,
-            year,
-            semester,
-            attendance_threshold: threshold,
-          });
-        } catch (err) {
-          if (err?.code !== 'OFFLINE') {
-            console.warn('Backend class update failed:', err?.message || err);
-          }
-        }
       }
+      const payload = students.map((s) => ({
+        application_number: s.application_number || '',
+        roll_number: s.roll_number || '',
+        prn_number: s.prn_number || '',
+        name: s.name,
+        email: s.email || '',
+        status: s.status || 'active',
+      }));
+      await api.importStudents(backendClassId, payload);
       await bulkImportStudents(classId, students);
-      // Mirror the roster into the backend (best-effort; reconciled on sync).
+
       try {
-        const { api } = await import('../lib/apiClient.js');
-        const payload = students.map((s) => ({
-          application_number: s.application_number || '',
-          roll_number: s.roll_number || '',
-          prn_number: s.prn_number || '',
-          name: s.name,
-          email: s.email || '',
-          status: s.status || 'active',
-        }));
-        await api.importStudents(klass?.backend_class_id || classId, payload);
-      } catch (err) {
-        if (err?.code !== 'OFFLINE') {
-          console.warn('Backend roster import failed:', err?.message || err);
-        }
-      }
-      // Pull backend ids down so local rows and the sheet stay aligned.
-      try {
-        const { syncDown } = await import('../lib/cacheSync.js');
         await syncDown();
-      } catch {
-        /* offline is fine — queue handles it */
+      } catch (syncError) {
+        console.warn('Backend cache refresh failed after class import:', syncError?.message || syncError);
       }
       pushToast({
         type: 'success',
         title: 'Students imported',
-        message: `${students.length} student${students.length === 1 ? '' : 's'} saved locally.`,
+        message: `${students.length} student${students.length === 1 ? '' : 's'} saved and synced.`,
       });
-      // After syncDown the class may carry the backend id — navigate to the live row.
-      const { default: db } = await import('../db/db.js');
-      const live = (await db.classes.toArray()).find(
-        (row) => row.class_name === name && (row.section || '') === (section || '')
-      );
-      navigate(`/classes/${live?.id || classId}`);
+      navigate(`/classes/${classId}`);
     } catch (err) {
       setError(err.message);
       pushToast({ type: 'error', title: 'Import failed', message: err.message });
@@ -200,49 +182,45 @@ export default function ClassSetup() {
     setBusy(true);
     try {
       if (editing) {
+        await api.updateClass({
+          class_id: klass?.backend_class_id || id,
+          class_name: name,
+          section,
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
         await updateClass(id, { class_name: name, section, year, semester, attendance_threshold: threshold });
-        try {
-          const { api } = await import('../lib/apiClient.js');
-          await api.updateClass({
-            class_id: klass?.backend_class_id || id,
-            class_name: name,
-            section,
-            year,
-            semester,
-            attendance_threshold: threshold,
-          });
-        } catch (err) {
-          if (err?.code !== 'OFFLINE') console.warn('Backend class update failed:', err?.message || err);
-        }
         navigate(`/classes/${id}`);
       } else {
-        const created = await addClass({ class_name: name, section, year, semester, attendance_threshold: threshold });
+        const response = await api.createClass({
+          class_name: name,
+          section,
+          subject: '',
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
+        const backendClassId = response.class.class_id;
+        await addClass({
+          id: backendClassId,
+          backend_class_id: backendClassId,
+          class_name: name,
+          section,
+          year,
+          semester,
+          attendance_threshold: threshold,
+        });
         try {
-          const { api } = await import('../lib/apiClient.js');
-          await api.createClass({
-            class_name: name,
-            section,
-            subject: klass?.subject || '',
-            year,
-            semester,
-            attendance_threshold: threshold,
-          });
-        } catch (err) {
-          if (err?.code !== 'OFFLINE') console.warn('Backend class create failed:', err?.message || err);
-        }
-        try {
-          const { syncDown } = await import('../lib/cacheSync.js');
           await syncDown();
-        } catch {
-          /* offline */
+        } catch (syncError) {
+          console.warn('Backend cache refresh failed after class creation:', syncError?.message || syncError);
         }
-        // syncDown may have adopted the backend id — navigate to the live row.
-        const { default: db } = await import('../db/db.js');
-        const live = (await db.classes.toArray()).find(
-          (row) => row.class_name === name && (row.section || '') === (section || '')
-        );
-        navigate(`/classes/${live?.id || created.id}`);
+        navigate(`/classes/${backendClassId}`);
       }
+    } catch (err) {
+      setError(err.message || 'The class could not be saved.');
+      pushToast({ type: 'error', title: 'Class save failed', message: err.message || 'Please try again.' });
     } finally {
       setBusy(false);
     }

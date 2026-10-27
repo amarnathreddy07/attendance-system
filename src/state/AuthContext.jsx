@@ -8,6 +8,7 @@ import { GOOGLE_CLIENT_ID, API_URL, isBackendConfigured } from '../lib/env.js';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'session_token';
+const REFRESH_KEY = 'refresh_token';
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -36,6 +37,7 @@ export function AuthProvider({ children }) {
   const [syncState, setSyncState] = useState({ pending: 0, lastResult: null });
   const mounted = useRef(true);
   const syncInFlight = useRef(null);
+  const refreshInFlight = useRef(null);
   const authChannel = useRef(null);
 
   useEffect(() => {
@@ -51,6 +53,57 @@ export function AuthProvider({ children }) {
     return count;
   }, []);
 
+  /** Persists a login/refresh result and informs other open tabs. */
+  const storeSession = useCallback(async (data) => {
+    setSessionToken(data.session_token);
+    await setSetting(TOKEN_KEY, data.session_token);
+    if (data.refresh_token !== undefined) {
+      await setSetting(REFRESH_KEY, data.refresh_token || null);
+    }
+    if (mounted.current) setUser(data.user);
+    authChannel.current?.postMessage({
+      type: 'signed-in',
+      token: data.session_token,
+      refreshToken: data.refresh_token,
+      user: data.user,
+    });
+  }, []);
+
+  /**
+   * Silently exchanges the stored refresh token for a new session. Returns
+   * true on success and false when the refresh token is no longer valid.
+   * Network failures are thrown so callers can retry later instead of
+   * signing the user out.
+   */
+  const refreshSession = useCallback(() => {
+    if (refreshInFlight.current) return refreshInFlight.current;
+
+    const run = (async () => {
+      const refreshToken = await getSetting(REFRESH_KEY);
+      if (!refreshToken) return false;
+      try {
+        const data = await api.refreshSession(refreshToken);
+        if (!data?.session_token) return false;
+        await storeSession(data);
+        return true;
+      } catch (error) {
+        if (
+          error instanceof ApiError &&
+          (error.code === 'UNAUTHENTICATED' || error.code === 'UNAUTHORIZED')
+        ) {
+          return false;
+        }
+        throw error;
+      }
+    })();
+
+    const promise = run.finally(() => {
+      if (refreshInFlight.current === promise) refreshInFlight.current = null;
+    });
+    refreshInFlight.current = promise;
+    return promise;
+  }, [storeSession]);
+
   /**
    * Drops an expired session so the user is prompted to sign in again. The
    * queued attendance stays on the device and syncs after re-authentication.
@@ -63,6 +116,7 @@ export function AuthProvider({ children }) {
     if ((await getSetting(TOKEN_KEY)) === expiredToken) {
       await setSetting(TOKEN_KEY, null);
     }
+    await setSetting(REFRESH_KEY, null);
     if (mounted.current) {
       setUser(null);
       setAuthError(error?.message || 'Your session has expired. Please sign in again.');
@@ -79,14 +133,39 @@ export function AuthProvider({ children }) {
     }
 
     const sync = (async () => {
-      const result = await flushSyncQueue();
-      if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
-      await refreshPending();
-      const authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
+      const flushOnce = async () => {
+        const token = getSessionToken();
+        const result = await flushSyncQueue();
+        if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
+        await refreshPending();
+        return { result, token };
+      };
+
+      let { result, token } = await flushOnce();
+      let authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
+
       if (authError) {
-        await expireSession(new ApiError(authError.code, authError.message), sessionToken);
-        return result;
+        let refreshed = false;
+        try {
+          refreshed = await refreshSession();
+        } catch (error) {
+          // Could not reach the backend to refresh; keep the session and the
+          // queued rows so they retry automatically later.
+          console.error('Could not refresh the session.', error);
+          return result;
+        }
+        if (!refreshed) {
+          await expireSession(new ApiError(authError.code, authError.message), token);
+          return result;
+        }
+        ({ result, token } = await flushOnce());
+        authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
+        if (authError) {
+          await expireSession(new ApiError(authError.code, authError.message), token);
+          return result;
+        }
       }
+
       if (result.synced > 0) {
         syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
       }
@@ -98,7 +177,7 @@ export function AuthProvider({ children }) {
     });
     syncInFlight.current = { sessionToken, promise };
     return promise;
-  }, [expireSession, refreshPending]);
+  }, [expireSession, refreshPending, refreshSession]);
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return undefined;
@@ -111,12 +190,20 @@ export function AuthProvider({ children }) {
         setSetting(TOKEN_KEY, data.token).catch((error) => {
           console.error('Could not persist the session from another tab.', error);
         });
+        if (data.refreshToken !== undefined) {
+          setSetting(REFRESH_KEY, data.refreshToken || null).catch((error) => {
+            console.error('Could not persist the refresh token from another tab.', error);
+          });
+        }
         syncNow().catch((error) => console.error('Automatic sync failed.', error));
       } else if (data?.type === 'signed-out') {
         resetSession();
         if (mounted.current) setUser(null);
         setSetting(TOKEN_KEY, null).catch((error) => {
           console.error('Could not clear the saved session after signing out.', error);
+        });
+        setSetting(REFRESH_KEY, null).catch((error) => {
+          console.error('Could not clear the saved refresh token after signing out.', error);
         });
       }
     };
@@ -151,39 +238,58 @@ export function AuthProvider({ children }) {
       return;
     }
     let bootstrapToken = null;
+    let storedRefresh = null;
     try {
       bootstrapToken = await getSetting(TOKEN_KEY);
-      if (!bootstrapToken) {
+      storedRefresh = await getSetting(REFRESH_KEY);
+      if (!bootstrapToken && !storedRefresh) {
         setReady(true);
         return;
       }
-      setSessionToken(bootstrapToken);
-      const data = await api.getCurrentUser();
-      if (!mounted.current) return;
-      setUser(data.user);
-      // Drain queued writes as soon as a stored session is restored.
-      syncNow().catch((error) => console.error('Automatic sync failed.', error));
-      // Populate the Dexie cache from the backend (best-effort).
-      syncDown().catch((error) => console.error('Could not refresh local data.', error));
-    } catch (error) {
-      if (
-        error instanceof ApiError &&
-        error.code === 'UNAUTHENTICATED' &&
-        bootstrapToken &&
-        getSessionToken() === bootstrapToken
-      ) {
+
+      if (bootstrapToken) {
+        setSessionToken(bootstrapToken);
+        try {
+          const data = await api.getCurrentUser();
+          if (!mounted.current) return;
+          setUser(data.user);
+          // Drain queued writes as soon as a stored session is restored.
+          syncNow().catch((error) => console.error('Automatic sync failed.', error));
+          // Populate the Dexie cache from the backend (best-effort).
+          syncDown().catch((error) => console.error('Could not refresh local data.', error));
+          return;
+        } catch (error) {
+          const sessionExpired =
+            error instanceof ApiError &&
+            error.code === 'UNAUTHENTICATED' &&
+            getSessionToken() === bootstrapToken;
+          if (!sessionExpired) throw error;
+          // Fall through and renew the session with the refresh token.
+        }
+      }
+
+      // Renew silently; the user should stay signed in across session expiry.
+      const refreshed = await refreshSession();
+      if (!refreshed) {
         resetSession();
         if ((await getSetting(TOKEN_KEY)) === bootstrapToken) {
           await setSetting(TOKEN_KEY, null);
         }
+        if ((await getSetting(REFRESH_KEY)) === storedRefresh) {
+          await setSetting(REFRESH_KEY, null);
+        }
         if (mounted.current) setUser(null);
-      } else {
-        console.error('Could not validate the saved session.', error);
+        return;
       }
+      if (!mounted.current) return;
+      syncNow().catch((error) => console.error('Automatic sync failed.', error));
+      syncDown().catch((error) => console.error('Could not refresh local data.', error));
+    } catch (error) {
+      console.error('Could not validate the saved session.', error);
     } finally {
       if (mounted.current) setReady(true);
     }
-  }, [syncNow]);
+  }, [refreshSession, syncNow]);
 
   useEffect(() => {
     bootstrap();
@@ -223,14 +329,7 @@ export function AuthProvider({ children }) {
     setAuthError(null);
     try {
       const data = await api.login(idToken);
-      setSessionToken(data.session_token);
-      await setSetting(TOKEN_KEY, data.session_token);
-      setUser(data.user);
-      authChannel.current?.postMessage({
-        type: 'signed-in',
-        token: data.session_token,
-        user: data.user,
-      });
+      await storeSession(data);
       // Attendance marked while signed out is still queued; drain it now,
       // then pull the roster so the UI matches the backend.
       syncNow().catch((error) => console.error('Automatic sync failed.', error));
@@ -242,7 +341,7 @@ export function AuthProvider({ children }) {
     } finally {
       if (mounted.current) setSigningIn(false);
     }
-  }, [syncNow]);
+  }, [storeSession, syncNow]);
 
   const signInWithGoogle = useCallback(async () => {
     const { requestGoogleIdToken } = await import('../lib/googleAuth.js');
@@ -253,6 +352,7 @@ export function AuthProvider({ children }) {
   const signOut = useCallback(async () => {
     resetSession();
     await setSetting(TOKEN_KEY, null);
+    await setSetting(REFRESH_KEY, null);
     if (mounted.current) setUser(null);
     authChannel.current?.postMessage({ type: 'signed-out' });
   }, []);

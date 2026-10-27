@@ -28,10 +28,18 @@ the spreadsheet kept private.
    - `lib/Auth.gs`
    - `lib/Handlers.gs`
    - `Code.gs`
-6. Run the `runPeopleSheetMigration` function once from the editor. This creates the eight tabs
-   (`Teachers`, `Admins`, `Classes`, `ClassTeachers`, `Students`, `Sessions`,
-   `Attendance`, `SyncLog`) with the correct headers.
+6. Run the `runPeopleSheetMigration` function once from the editor. This creates the eight
+   tabs (`Teachers`, `Admins`, `Classes`, `ClassTeachers`, `Students`, `Sessions`,
+   `Attendance`, `SyncLog`) with the correct headers. Missing tabs are also created
+   automatically on the first request, so attendance sync can bootstrap an empty
+   spreadsheet.
 7. Authorise the Sheets scope when prompted.
+
+When a teacher or admin creates a class, the backend automatically creates a
+`Class_<class-id>` worksheet in this same spreadsheet. The worksheet includes
+the class details followed by its attendance ledger; new submissions and
+attendance corrections are mirrored there. The shared `Classes`, `Students`,
+`Sessions`, and `Attendance` tabs remain the canonical data tables.
 
 ## 3. Script properties
 
@@ -43,6 +51,7 @@ Project Settings → Script Properties:
 | `GOOGLE_CLIENT_ID` | OAuth client id the frontend will use (step 5) |
 | `ORG_EMAIL_DOMAIN` | optional, e.g. `university.edu` — extra restriction on top of both people sheets |
 | `SESSION_TTL_HOURS` | optional, default `24` |
+| `REFRESH_TTL_DAYS` | optional, default `30`; how long the app can renew a session without another Google sign-in |
 | `SESSION_SECRET` | leave empty; generated automatically on first login. Rotating it signs everyone out. |
 
 ## 4. Deploy the Web App

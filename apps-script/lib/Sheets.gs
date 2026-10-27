@@ -74,9 +74,186 @@ SCHEMA[SHEETS.ATTENDANCE] = [
 ];
 SCHEMA[SHEETS.SYNC_LOG] = ['client_operation_id', 'action', 'processed_at', 'result'];
 
+var CLASS_ATTENDANCE_HEADER_ROW = 13;
+var CLASS_ATTENDANCE_FIRST_DATA_ROW = CLASS_ATTENDANCE_HEADER_ROW + 1;
+var CLASS_ATTENDANCE_HEADERS = [
+  'session_id',
+  'date',
+  'student_id',
+  'roll_number',
+  'prn_number',
+  'application_number',
+  'student_name',
+  'status',
+  'marked_by',
+  'created_at',
+  'updated_at',
+];
+
 function getSpreadsheet_() {
   var id = requireConfig_('spreadsheetId');
   return SpreadsheetApp.openById(id);
+}
+
+function classAttendanceSheetName_(classId) {
+  return 'Class_' + String(classId || '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 90);
+}
+
+function classAttendanceThreshold_(klass) {
+  var threshold = Number(klass.attendance_threshold);
+  return isFinite(threshold) ? threshold : 75;
+}
+
+function hasClassAttendanceSheet_(klass) {
+  var sheet = getSpreadsheet_().getSheetByName(classAttendanceSheetName_(klass.class_id));
+  if (!sheet) return false;
+  return String(sheet.getRange(2, 2, 1, 1).getValues()[0][0] || '').trim() === normalizeId_(klass.class_id);
+}
+
+function ensureClassAttendanceSheets_(classes) {
+  (classes || []).forEach(function (klass) {
+    if (hasClassAttendanceSheet_(klass)) return;
+    withSheetLock_(function () {
+      if (!hasClassAttendanceSheet_(klass)) syncClassAttendanceSheet_(klass);
+    });
+  });
+}
+
+/**
+ * Creates one class-owned worksheet in the configured spreadsheet. Shared
+ * tables remain canonical; this tab is a readable, class-specific attendance
+ * ledger and can be rebuilt from those tables if needed.
+ */
+function ensureClassAttendanceSheet_(klass) {
+  var classId = normalizeId_(klass.class_id);
+  if (!classId) throw appError_('SERVER_ERROR', 'Cannot create an attendance sheet without a class ID.');
+
+  var name = classAttendanceSheetName_(classId);
+  var ss = getSpreadsheet_();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
+
+  var existingClassId = String(sheet.getRange(2, 2, 1, 1).getValues()[0][0] || '').trim();
+  if (existingClassId && existingClassId !== classId) {
+    throw appError_('SERVER_ERROR', 'The class attendance sheet name conflicts with another class.');
+  }
+
+  if (!existingClassId) {
+    if (sheet.getLastRow() > 0) {
+      throw appError_('SERVER_ERROR', 'A non-class worksheet already uses the name "' + name + '".');
+    }
+    sheet.getRange(1, 1, 1, 2).setValues([['AttendIt Class Attendance', '']]);
+    sheet.getRange(2, 1, 10, 2).setValues([
+      ['Class ID', classId],
+      ['Class Name', String(klass.class_name || '')],
+      ['Section', String(klass.section || '')],
+      ['Subject', String(klass.subject || '')],
+      ['Year', String(klass.year || '')],
+      ['Semester', String(klass.semester || '')],
+      ['Teacher ID', normalizeId_(klass.teacher_id)],
+      ['Attendance Threshold (%)', classAttendanceThreshold_(klass)],
+      ['Created At', String(klass.created_at || '')],
+      ['Updated At', String(klass.updated_at || '')],
+    ]);
+    sheet.getRange(CLASS_ATTENDANCE_HEADER_ROW, 1, 1, CLASS_ATTENDANCE_HEADERS.length)
+      .setValues([CLASS_ATTENDANCE_HEADERS]);
+    sheet.setFrozenRows(CLASS_ATTENDANCE_HEADER_ROW);
+  } else {
+    var headers = sheet.getRange(CLASS_ATTENDANCE_HEADER_ROW, 1, 1, CLASS_ATTENDANCE_HEADERS.length).getValues()[0];
+    if (!CLASS_ATTENDANCE_HEADERS.every(function (header, index) { return headers[index] === header; })) {
+      throw appError_('SERVER_ERROR', 'The class attendance worksheet has an invalid header row.');
+    }
+    sheet.getRange(3, 2, 9, 1).setValues([
+      [String(klass.class_name || '')],
+      [String(klass.section || '')],
+      [String(klass.subject || '')],
+      [String(klass.year || '')],
+      [String(klass.semester || '')],
+      [normalizeId_(klass.teacher_id)],
+      [classAttendanceThreshold_(klass)],
+      [String(klass.created_at || '')],
+      [String(klass.updated_at || '')],
+    ]);
+  }
+  return sheet;
+}
+
+function updateClassAttendanceRows_(sheet, entries) {
+  if (!entries.length) return;
+  var ordered = entries.slice().sort(function (a, b) {
+    return a.row - b.row;
+  });
+  var startRow = ordered[0].row;
+  var run = [ordered[0]];
+
+  for (var i = 1; i <= ordered.length; i += 1) {
+    var contiguous = i < ordered.length && ordered[i].row === run[run.length - 1].row + 1;
+    if (contiguous) {
+      run.push(ordered[i]);
+      continue;
+    }
+    sheet.getRange(startRow, 1, run.length, CLASS_ATTENDANCE_HEADERS.length)
+      .setValues(run.map(function (entry) { return entry.values; }));
+    if (i < ordered.length) {
+      startRow = ordered[i].row;
+      run = [ordered[i]];
+    }
+  }
+}
+
+/** Reconciles the class ledger against canonical Students and Attendance rows. */
+function syncClassAttendanceSheet_(klass) {
+  var sheet = ensureClassAttendanceSheet_(klass);
+  var classId = normalizeId_(klass.class_id);
+  var studentsById = indexBy_(listStudentsForClass_(classId, true), 'student_id');
+  var records = getTable_(SHEETS.ATTENDANCE).filter(function (record) {
+    return normalizeId_(record.class_id) === classId;
+  });
+  var lastRow = sheet.getLastRow();
+  var existingRows = lastRow >= CLASS_ATTENDANCE_FIRST_DATA_ROW
+    ? sheet.getRange(
+        CLASS_ATTENDANCE_FIRST_DATA_ROW,
+        1,
+        lastRow - CLASS_ATTENDANCE_HEADER_ROW,
+        CLASS_ATTENDANCE_HEADERS.length
+      ).getValues()
+    : [];
+  var rowByAttendance = {};
+  existingRows.forEach(function (row, index) {
+    var key = String(row[0] || '').trim() + '|' + String(row[2] || '').trim();
+    if (key !== '|') rowByAttendance[key] = CLASS_ATTENDANCE_FIRST_DATA_ROW + index;
+  });
+
+  var inserts = [];
+  var updates = [];
+  records.forEach(function (record) {
+    var student = studentsById[normalizeId_(record.student_id)] || {};
+    var values = [
+      normalizeId_(record.session_id),
+      String(record.date || ''),
+      normalizeId_(record.student_id),
+      String(student.roll_number || ''),
+      String(student.prn_number || ''),
+      String(student.application_number || ''),
+      String(student.name || ''),
+      String(record.status || ''),
+      String(record.marked_by || ''),
+      String(record.created_at || ''),
+      String(record.updated_at || ''),
+    ];
+    var key = values[0] + '|' + values[2];
+    if (rowByAttendance[key]) {
+      updates.push({ row: rowByAttendance[key], values: values });
+    } else {
+      inserts.push(values);
+    }
+  });
+
+  updateClassAttendanceRows_(sheet, updates);
+  if (inserts.length) {
+    var startRow = Math.max(sheet.getLastRow() + 1, CLASS_ATTENDANCE_FIRST_DATA_ROW);
+    sheet.getRange(startRow, 1, inserts.length, CLASS_ATTENDANCE_HEADERS.length).setValues(inserts);
+  }
 }
 
 function cacheKey_(name) {
@@ -442,6 +619,29 @@ function migrateLegacyPeople_() {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Creates any missing tabs (with their headers) so the first sync can write
+ * attendance even before an operator runs the setup migration. Unlike
+ * ensureSchema_ this never rewrites an existing tab's header row, so it is
+ * safe to run automatically on every request (guarded by a short cache).
+ */
+function ensureMissingSheets_() {
+  var cache = CacheService.getScriptCache();
+  if (cache.get('attendit.schema.ready') === '1') return;
+  var ss = getSpreadsheet_();
+  Object.keys(SCHEMA).forEach(function (name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) sheet = ss.insertSheet(name);
+    if (sheet.getLastRow() < 1) {
+      var headers = SCHEMA[name];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.setFrozenRows(1);
+    }
+  });
+  cache.put('attendit.schema.ready', '1', 300);
+  invalidateTables_(null);
 }
 
 /** Creates the spreadsheet tabs with headers if they do not exist yet. */

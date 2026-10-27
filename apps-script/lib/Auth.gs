@@ -16,6 +16,11 @@
 
 var TOKENINFO_URL_ = 'https://oauth2.googleapis.com/tokeninfo';
 
+var TOKEN_TYPES = {
+  SESSION: 'session',
+  REFRESH: 'refresh',
+};
+
 /** Test seam: the harness replaces this to simulate Google's response. */
 var HTTP_FETCH_ = function (url) {
   return UrlFetchApp.fetch(url, { muteHttpExceptions: true });
@@ -40,7 +45,37 @@ function handleLogin_(ctx) {
 
   var user = publicUser_(principal);
   var session = issueSession_(user);
-  return { user: user, session_token: session.token, expires_at: session.expires_at };
+  return sessionPayload_(user, session);
+}
+
+/**
+ * Exchanges a valid refresh token for a fresh session (and a rotated refresh
+ * token). This lets the app stay signed in after the short-lived session
+ * expires without asking the user to repeat Google sign-in.
+ */
+function handleRefreshSession_(ctx) {
+  var refreshToken = requireString_(ctx.body.refresh_token, 'refresh_token', 4096);
+  var payload = verifyRefreshToken_(refreshToken);
+  if (!payload) {
+    throw appError_('UNAUTHENTICATED', 'Your session has expired. Please sign in again.');
+  }
+
+  var principal = findPrincipalById_(payload.tid, payload.rl);
+  if (!principal) {
+    throw appError_('UNAUTHENTICATED', 'Your session has expired. Please sign in again.');
+  }
+  var user = requireActiveUser_(publicUser_(principal));
+  return sessionPayload_(user, issueSession_(user));
+}
+
+function sessionPayload_(user, session) {
+  return {
+    user: user,
+    session_token: session.token,
+    expires_at: session.expires_at,
+    refresh_token: session.refresh_token,
+    refresh_expires_at: session.refresh_expires_at,
+  };
 }
 
 function handleGetCurrentUser_(ctx) {
@@ -89,18 +124,30 @@ function verifyGoogleIdToken_(idToken) {
 
 function issueSession_(user) {
   var config = getConfig_();
-  var ttlHours = config.sessionTtlHours > 0 ? config.sessionTtlHours : DEFAULT_SESSION_TTL_HOURS;
+  var sessionTtlHours = config.sessionTtlHours > 0 ? config.sessionTtlHours : DEFAULT_SESSION_TTL_HOURS;
+  var refreshTtlDays = config.refreshTtlDays > 0 ? config.refreshTtlDays : DEFAULT_REFRESH_TTL_DAYS;
   var issuedAt = nowMs_();
+  var session = issueToken_(user, TOKEN_TYPES.SESSION, issuedAt, sessionTtlHours * 3600000);
+  var refresh = issueToken_(user, TOKEN_TYPES.REFRESH, issuedAt, refreshTtlDays * 86400000);
+  return {
+    token: session.token,
+    expires_at: session.expires_at,
+    refresh_token: refresh.token,
+    refresh_expires_at: refresh.expires_at,
+  };
+}
+
+function issueToken_(user, type, issuedAt, ttlMs) {
   var payload = {
     tid: normalizeId_(user.teacher_id),
     em: normalizeEmail_(user.email),
     rl: user.role,
+    typ: type,
     iat: issuedAt,
-    exp: issuedAt + ttlHours * 3600000,
+    exp: issuedAt + ttlMs,
     jti: Utilities.getUuid(),
   };
-  var token = signToken_(payload);
-  return { token: token, expires_at: new Date(payload.exp).toISOString() };
+  return { token: signToken_(payload), expires_at: new Date(payload.exp).toISOString() };
 }
 
 function signToken_(payload) {
@@ -123,6 +170,20 @@ function resolveUser_(ctx) {
 }
 
 function verifySessionToken_(token) {
+  var payload = verifyToken_(token);
+  if (!payload) return null;
+  // Refresh tokens are not accepted as session tokens.
+  if (payload.typ === TOKEN_TYPES.REFRESH) return null;
+  return payload;
+}
+
+function verifyRefreshToken_(token) {
+  var payload = verifyToken_(token);
+  if (!payload || payload.typ !== TOKEN_TYPES.REFRESH) return null;
+  return payload;
+}
+
+function verifyToken_(token) {
   var parts = String(token || '').split('.');
   if (parts.length !== 2) return null;
 

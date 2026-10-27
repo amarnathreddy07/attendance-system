@@ -16,7 +16,9 @@ function handleGetTodayClasses_(ctx) {
 
 function handleGetClasses_(ctx) {
   var user = requireUser_(ctx);
-  var classes = listActiveClassesFor_(user).map(function (klass) {
+  var sourceClasses = listActiveClassesFor_(user);
+  ensureClassAttendanceSheets_(sourceClasses);
+  var classes = sourceClasses.map(function (klass) {
     return dtoClass_(klass, { student_count: listStudentsForClass_(klass.class_id, false).length });
   });
   return { classes: classes };
@@ -199,7 +201,9 @@ function handleAdminGetClasses_(ctx) {
     assignments[classId].push(normalizeId_(row.teacher_id));
   });
 
-  var classes = getTable_(SHEETS.CLASSES)
+  var sourceClasses = getTable_(SHEETS.CLASSES);
+  ensureClassAttendanceSheets_(sourceClasses);
+  var classes = sourceClasses
     .map(function (klass) {
       var classId = normalizeId_(klass.class_id);
       var owner = teachers[normalizeId_(klass.teacher_id)];
@@ -251,6 +255,7 @@ function handleCreateClass_(ctx) {
       created_at: stamp,
       updated_at: stamp,
     };
+    ensureClassAttendanceSheet_(row);
     appendRows_(SHEETS.CLASSES, [row]);
     if (owner) {
       appendRows_(SHEETS.CLASS_TEACHERS, [
@@ -281,6 +286,7 @@ function handleUpdateClass_(ctx) {
     next.updated_at = nowIso_();
 
     updateRow_(SHEETS.CLASSES, { __row: existing.__row, row: next });
+    ensureClassAttendanceSheet_(next);
     return { class: dtoClass_(next) };
   });
 }
@@ -329,6 +335,8 @@ function handleImportStudents_(ctx) {
 
     appendRows_(SHEETS.STUDENTS, inserts);
     updateRowsByIndex_(SHEETS.STUDENTS, updates);
+    invalidateTables_([SHEETS.STUDENTS]);
+    ensureClassAttendanceSheet_(klass);
 
     return {
       added: inserts.length,
@@ -380,6 +388,7 @@ function handleAdminAssignTeacher_(ctx) {
           updated_at: nowIso_(),
         });
         updateRow_(SHEETS.CLASSES, { __row: klass.__row, row: promoted });
+        ensureClassAttendanceSheet_(promoted);
       }
       return { assigned: false };
     }
@@ -394,6 +403,7 @@ function handleAdminAssignTeacher_(ctx) {
     if (ctx.body.primary === true || !normalizeId_(klass.teacher_id)) {
       var promoted = Object.assign({}, klass, { teacher_id: normalizeId_(teacherId), updated_at: nowIso_() });
       updateRow_(SHEETS.CLASSES, { __row: klass.__row, row: promoted });
+      ensureClassAttendanceSheet_(promoted);
     }
     return { assigned: true };
   });

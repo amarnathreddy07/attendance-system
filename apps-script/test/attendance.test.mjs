@@ -51,6 +51,27 @@ test('submitting attendance writes one session and one row per student', () => {
     ['A', 'P', 'P']
   );
   assert.ok(records.every((row) => row[6] === 'alice@example.edu'));
+
+  const classSheet = backend.spreadsheet.sheets[`Class_${CLASS_ID}`];
+  assert.ok(classSheet, 'class worksheet is created when attendance is submitted');
+  assert.equal(classSheet.matrix[2][1], 'Physics I');
+  assert.deepEqual(classSheet.matrix[12], [
+    'session_id',
+    'date',
+    'student_id',
+    'roll_number',
+    'prn_number',
+    'application_number',
+    'student_name',
+    'status',
+    'marked_by',
+    'created_at',
+    'updated_at',
+  ]);
+  assert.equal(classSheet.matrix.length, 16);
+  assert.equal(classSheet.matrix[13][2], 'stu_1');
+  assert.equal(classSheet.matrix[13][6], 'Asha Rao');
+  assert.equal(classSheet.matrix[13][7], 'P');
 });
 
 test('statuses are normalized to P / A / OD regardless of the input spelling', () => {
@@ -86,6 +107,22 @@ test('replaying the same client_operation_id writes nothing new', () => {
   assert.equal(backend.spreadsheet.table('Attendance').rows.length, 3, 'no duplicate rows');
   assert.equal(backend.spreadsheet.table('Sessions').rows.length, 1);
   assert.equal(backend.spreadsheet.table('SyncLog').rows.length, 1);
+});
+
+test('a retried submission repairs a missing class attendance worksheet', () => {
+  const backend = createBackend({ data: seed() });
+  const token = teacherSession(backend);
+  submit(backend, token);
+  delete backend.spreadsheet.sheets[`Class_${CLASS_ID}`];
+
+  const retry = submit(backend, token);
+
+  assert.equal(retry.success, true);
+  assert.equal(retry.data.duplicate, true);
+  const classSheet = backend.spreadsheet.sheets[`Class_${CLASS_ID}`];
+  assert.ok(classSheet);
+  assert.equal(classSheet.matrix.length, 16);
+  assert.equal(classSheet.matrix[13][2], 'stu_1');
 });
 
 test('a second, different submission for the same class and date is refused', () => {
@@ -125,6 +162,9 @@ test('resubmitting the same session_id updates rows in place instead of duplicat
   const rows = backend.spreadsheet.table('Attendance').rows;
   assert.equal(rows.find((row) => row[2] === 'stu_1')[5], 'A');
   assert.equal(rows.find((row) => row[2] === 'stu_2')[5], 'P');
+  const classSheetRows = backend.spreadsheet.sheets[`Class_${CLASS_ID}`].matrix.slice(13);
+  assert.equal(classSheetRows.find((row) => row[2] === 'stu_1')[7], 'A');
+  assert.equal(classSheetRows.find((row) => row[2] === 'stu_2')[7], 'P');
 });
 
 test('every invalid row is reported at once, not just the first', () => {
@@ -274,6 +314,33 @@ test('the dashboard reports today\'s classes with roster size and attendance sta
   assert.equal(after.data.classes[0].session_id, 'ses_local_1');
 });
 
+test('syncing an existing class creates its worksheet and backfills prior attendance', () => {
+  const data = seed();
+  data.Attendance.push([
+    'att_old',
+    'ses_old',
+    'stu_1',
+    CLASS_ID,
+    '2026-01-10',
+    'A',
+    'alice@example.edu',
+    'op_old',
+    '2026-01-10T09:00:00.000Z',
+    '2026-01-10T09:00:00.000Z',
+  ]);
+  const backend = createBackend({ data });
+
+  const result = callAction(backend, 'getClasses', {}, teacherSession(backend));
+
+  assert.equal(result.success, true);
+  const classSheet = backend.spreadsheet.sheets[`Class_${CLASS_ID}`];
+  assert.ok(classSheet);
+  assert.equal(classSheet.matrix[13][1], '2026-01-10');
+  assert.equal(classSheet.matrix[13][6], 'Asha Rao');
+  assert.equal(classSheet.matrix[13][7], 'A');
+  assert.equal(backend.spreadsheet.sheets[`Class_${OTHER_CLASS_ID}`], undefined, 'teachers only initialize visible classes');
+});
+
 test('a teacher only sees their own classes', () => {
   const backend = createBackend({ data: seed() });
   const alice = callAction(backend, 'getClasses', {}, teacherSession(backend));
@@ -339,6 +406,9 @@ test('corrections after submission are applied in one batch', () => {
   assert.equal(rows.find((row) => row[2] === 'stu_2')[5], 'P');
   assert.equal(rows.find((row) => row[2] === 'stu_3')[5], 'A');
   assert.equal(rows.length, 3, 'corrections never add rows');
+  const classSheetRows = backend.spreadsheet.sheets[`Class_${CLASS_ID}`].matrix.slice(13);
+  assert.equal(classSheetRows.find((row) => row[2] === 'stu_2')[7], 'P');
+  assert.equal(classSheetRows.find((row) => row[2] === 'stu_3')[7], 'A');
 });
 
 test('a correction for a row that was never marked is rejected', () => {
@@ -500,6 +570,11 @@ test('a teacher creates their own class and owns it immediately', () => {
   assert.equal(created.success, true);
   assert.equal(created.data.class.teacher_id, TEACHER_ID);
   assert.equal(created.data.class.attendance_threshold, 70);
+  assert.equal(created.data.class.attendance_sheet_name, `Class_${created.data.class.class_id}`);
+  const classSheet = backend.spreadsheet.sheets[created.data.class.attendance_sheet_name];
+  assert.ok(classSheet, 'creating a class creates its worksheet immediately');
+  assert.equal(classSheet.matrix[2][1], 'Thermodynamics');
+  assert.equal(classSheet.matrix[3][1], 'C');
 
   const classes = callAction(backend, 'getClasses', {}, token);
   assert.equal(classes.data.classes.length, 2);
@@ -530,6 +605,9 @@ test('a teacher updates only their own class', () => {
   const storedClass = backend.spreadsheet.table('Classes').rows.find((row) => row[0] === mine.data.class.class_id);
   assert.equal(storedClass[1], 'Mine Renamed');
   assert.equal(storedClass[7], 80);
+  const classSheet = backend.spreadsheet.sheets[`Class_${mine.data.class.class_id}`];
+  assert.equal(classSheet.matrix[2][1], 'Mine Renamed');
+  assert.equal(classSheet.matrix[8][1], 80);
 
   const blocked = callAction(
     backend,
