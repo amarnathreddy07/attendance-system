@@ -51,6 +51,26 @@ export function AuthProvider({ children }) {
     return count;
   }, []);
 
+  /**
+   * Drops an expired session so the user is prompted to sign in again. The
+   * queued attendance stays on the device and syncs after re-authentication.
+   * `expiredToken` guards against signing out a newer session that was
+   * established in another tab while this request was in flight.
+   */
+  const expireSession = useCallback(async (error, expiredToken) => {
+    if (!expiredToken || getSessionToken() !== expiredToken) return false;
+    resetSession();
+    if ((await getSetting(TOKEN_KEY)) === expiredToken) {
+      await setSetting(TOKEN_KEY, null);
+    }
+    if (mounted.current) {
+      setUser(null);
+      setAuthError(error?.message || 'Your session has expired. Please sign in again.');
+    }
+    authChannel.current?.postMessage({ type: 'signed-out' });
+    return true;
+  }, []);
+
   const syncNow = useCallback(() => {
     const sessionToken = getSessionToken();
     if (syncInFlight.current) {
@@ -62,6 +82,11 @@ export function AuthProvider({ children }) {
       const result = await flushSyncQueue();
       if (mounted.current) setSyncState({ pending: result.remaining, lastResult: result });
       await refreshPending();
+      const authError = result.errors?.find((error) => error.code === 'UNAUTHENTICATED');
+      if (authError) {
+        await expireSession(new ApiError(authError.code, authError.message), sessionToken);
+        return result;
+      }
       if (result.synced > 0) {
         syncDown().catch((error) => console.error('Could not refresh local data after syncing.', error));
       }
@@ -73,7 +98,7 @@ export function AuthProvider({ children }) {
     });
     syncInFlight.current = { sessionToken, promise };
     return promise;
-  }, [refreshPending]);
+  }, [expireSession, refreshPending]);
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return undefined;
