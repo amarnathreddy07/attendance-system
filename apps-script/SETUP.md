@@ -138,5 +138,6 @@ A `SERVER_ERROR` mentioning a script property means step 3 is incomplete.
 | `UNAUTHENTICATED` on login | wrong `GOOGLE_CLIENT_ID`, or the token audience differs |
 | `UNAUTHORIZED` on login | email missing from `Teachers` and `Admins`, or `active` is `FALSE`, or domain mismatch |
 | `UNAUTHORIZED` on a class | the teacher is not the class owner |
+| `NOT_FOUND: Unknown action: refreshSession` | the deployed Web App is an older version; deploy a new version containing the current `Auth.gs` and `Code.gs` |
 | `DUPLICATE` on submit | attendance already submitted for that class + date |
 | Everything works in editor but not in the Web App | stale deployment — redeploy as a new version |

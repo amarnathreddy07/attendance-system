@@ -9,6 +9,8 @@ import { GOOGLE_CLIENT_ID, API_URL, isBackendConfigured } from '../lib/env.js';
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'session_token';
 const REFRESH_KEY = 'refresh_token';
+const REFRESH_DEPLOYMENT_MESSAGE =
+  'Your session expired, and the deployed Apps Script backend does not support session refresh yet. Deploy the latest Apps Script version, then sign in again.';
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -93,6 +95,9 @@ export function AuthProvider({ children }) {
         ) {
           return false;
         }
+        if (error instanceof ApiError && error.code === 'NOT_FOUND') {
+          throw new ApiError('BACKEND_UPDATE_REQUIRED', REFRESH_DEPLOYMENT_MESSAGE, error.details);
+        }
         throw error;
       }
     })();
@@ -149,6 +154,20 @@ export function AuthProvider({ children }) {
         try {
           refreshed = await refreshSession();
         } catch (error) {
+          if (error instanceof ApiError && error.code === 'BACKEND_UPDATE_REQUIRED') {
+            resetSession();
+            if ((await getSetting(TOKEN_KEY)) === token) await setSetting(TOKEN_KEY, null);
+            if (mounted.current) {
+              setUser(null);
+              setAuthError(error.message);
+            }
+            authChannel.current?.postMessage({
+              type: 'signed-out',
+              preserveRefreshToken: true,
+              message: error.message,
+            });
+            return result;
+          }
           // Could not reach the backend to refresh; keep the session and the
           // queued rows so they retry automatically later.
           console.error('Could not refresh the session.', error);
@@ -186,7 +205,10 @@ export function AuthProvider({ children }) {
     channel.onmessage = ({ data }) => {
       if (data?.type === 'signed-in' && data.token && data.user) {
         setSessionToken(data.token);
-        if (mounted.current) setUser(data.user);
+        if (mounted.current) {
+          setUser(data.user);
+          setAuthError(null);
+        }
         setSetting(TOKEN_KEY, data.token).catch((error) => {
           console.error('Could not persist the session from another tab.', error);
         });
@@ -198,13 +220,18 @@ export function AuthProvider({ children }) {
         syncNow().catch((error) => console.error('Automatic sync failed.', error));
       } else if (data?.type === 'signed-out') {
         resetSession();
-        if (mounted.current) setUser(null);
+        if (mounted.current) {
+          setUser(null);
+          if (data.message) setAuthError(data.message);
+        }
         setSetting(TOKEN_KEY, null).catch((error) => {
           console.error('Could not clear the saved session after signing out.', error);
         });
-        setSetting(REFRESH_KEY, null).catch((error) => {
-          console.error('Could not clear the saved refresh token after signing out.', error);
-        });
+        if (!data.preserveRefreshToken) {
+          setSetting(REFRESH_KEY, null).catch((error) => {
+            console.error('Could not clear the saved refresh token after signing out.', error);
+          });
+        }
       }
     };
     return () => {
@@ -286,6 +313,16 @@ export function AuthProvider({ children }) {
       syncDown().catch((error) => console.error('Could not refresh local data.', error));
     } catch (error) {
       console.error('Could not validate the saved session.', error);
+      if (error instanceof ApiError && error.code === 'BACKEND_UPDATE_REQUIRED') {
+        resetSession();
+        if (bootstrapToken && (await getSetting(TOKEN_KEY)) === bootstrapToken) {
+          await setSetting(TOKEN_KEY, null);
+        }
+        if (mounted.current) {
+          setUser(null);
+          setAuthError(error.message);
+        }
+      }
     } finally {
       if (mounted.current) setReady(true);
     }
